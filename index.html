@@ -104,20 +104,6 @@ html,body{width:100%;height:100%;overflow:hidden;touch-action:none;background:#0
     </div>
 
     <script>
-        window.addEventListener('error', function(e) {
-            console.error('Zulu Wars runtime error:', e.error || e.message);
-            let box = document.getElementById('zulu-runtime-error');
-            if (!box) {
-                box = document.createElement('div');
-                box.id = 'zulu-runtime-error';
-                box.style.cssText =
-                    'position:fixed;left:12px;right:12px;bottom:12px;z-index:99999;' +
-                    'padding:12px;background:rgba(45,12,15,.95);border:1px solid #c75b55;' +
-                    'border-radius:10px;color:#eee8d8;font:11px monospace;white-space:pre-wrap;';
-                document.body.appendChild(box);
-            }
-            box.textContent = 'GAME ERROR: ' + (e.error?.stack || e.message || 'Unknown error');
-        });
 
         const GAME_VERSION = "ZULU WARS";
 
@@ -173,6 +159,7 @@ html,body{width:100%;height:100%;overflow:hidden;touch-action:none;background:#0
         renderer.shadowMap.enabled = true;
         renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         container.appendChild(renderer.domElement);
+        renderer.domElement.style.display = 'block';
         container.style.display = 'block';
 
         window.addEventListener('resize', () => {
@@ -362,8 +349,8 @@ html,body{width:100%;height:100%;overflow:hidden;touch-action:none;background:#0
             const pModel = new THREE.Group();
             
             // Torso
-            const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.34, 0.62, 4, 8), tunicMat);
-            torso.position.y = 1.0; torso.scale.set(1.0,1.05,0.72); pModel.add(torso);
+            const torso = new THREE.Mesh(new THREE.SphereGeometry(0.43, 8, 6), tunicMat);
+            torso.position.y = 1.0; torso.scale.set(0.88,1.18,0.68); pModel.add(torso);
 
             const belt1 = new THREE.Mesh(new THREE.BoxGeometry(0.67, 0.08, 0.37), beltMat);
             belt1.position.y = 0.95; belt1.rotation.z = 0.45;
