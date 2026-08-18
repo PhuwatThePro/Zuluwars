@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>1879 Monte-Zulu war - Mountain Pass v1.2.1</title>
+    <title>1879 Frontier Defense - Mountain Pass v1.3.0</title>
     <style>
         * { box-sizing: border-box; user-select: none; -webkit-user-select: none; margin: 0; padding: 0; }
         body, html { 
@@ -86,7 +86,7 @@
                 <div style="font-size: 10px; color: #88ff88; margin-top: 4px;" id="network-status">OFFLINE</div>
             </div>
             <div id="hud-center">
-                <span class="version-badge">v1.2.1</span>
+                <span class="version-badge">v1.3.0</span>
                 <button class="icon-btn" onclick="toggleSettings()">⚙ SETTINGS</button>
                 <div id="room-code-badge">ROOM CODE: <span id="room-code-val">----</span></div>
             </div>
@@ -150,7 +150,7 @@
     </div>
 
     <script>
-        const GAME_VERSION = "v1.2.1";
+        const GAME_VERSION = "v1.3.0";
 
         const STATE = {
             hp: 100,
@@ -171,12 +171,12 @@
         };
 
         const CONFIG = {
-            musketCooldown: 2700, // 1.5x reload time (1800 * 1.5)
+            musketCooldown: 2700, // 1.5x reload time
             swordCooldown: 800,
             swordRange: 5.5,
-            baseSpeed: 0.10, // Matching player speed (0.10)
+            baseSpeed: 0.10, // Match player speed
             baseSpawnInterval: 2200,
-            zuluDamage: 36,   // 2x attack damage (18 * 2)
+            zuluDamage: 36,   // 2x attack damage
             swordDamage: 1
         };
 
@@ -224,14 +224,14 @@
         ground.receiveShadow = true;
         scene.add(ground);
 
-        // Deterministic Seed Generator
+        // Seeded RNG
         let seedValue = 1879;
         function seededRandom() {
             let x = Math.sin(seedValue++) * 10000;
             return x - Math.floor(x);
         }
 
-        // Mountains & Colliders
+        // Environment
         const mountainMat = new THREE.MeshStandardMaterial({ color: 0x3d3123, roughness: 0.9 });
         const mountainColliders = [];
 
@@ -281,17 +281,14 @@
                 const treeGroup = new THREE.Group();
                 const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.35, 2.6, 6), trunkMat);
                 trunk.position.y = 1.3;
-                trunk.castShadow = true;
                 treeGroup.add(trunk);
 
                 const f1 = new THREE.Mesh(new THREE.ConeGeometry(1.6, 3.2, 6), foliageMat);
                 f1.position.y = 3.2;
-                f1.castShadow = true;
                 treeGroup.add(f1);
 
                 const f2 = new THREE.Mesh(new THREE.ConeGeometry(1.2, 2.6, 6), foliageMat);
                 f2.position.y = 4.4;
-                f2.castShadow = true;
                 treeGroup.add(f2);
 
                 const tx = (seededRandom() - 0.5) * 40;
@@ -315,7 +312,7 @@
             return false;
         }
 
-        // Dynamic Barricade System with Respawning & Destruction Timers
+        // Barricades
         const barricades = [];
         const bagMat = new THREE.MeshStandardMaterial({ color: 0xb5a075, roughness: 0.9 });
 
@@ -352,7 +349,7 @@
             });
         }
 
-        // 3D Nametag Sprite
+        // Nametag
         function createNametagSprite(nameText) {
             const canvas = document.createElement('canvas');
             canvas.width = 256; canvas.height = 64;
@@ -377,7 +374,7 @@
             return sprite;
         }
 
-        // Materials & Soldier Builders
+        // Character Models & Weapon Attachment
         const tunicMat = new THREE.MeshStandardMaterial({ color: 0xa81c1c, roughness: 0.7 }); 
         const pantsMat = new THREE.MeshStandardMaterial({ color: 0x1c2738, roughness: 0.8 }); 
         const helmetMat = new THREE.MeshStandardMaterial({ color: 0xeee8dc, roughness: 0.5 }); 
@@ -388,6 +385,8 @@
 
         function createSoldierMesh() {
             const pModel = new THREE.Group();
+            
+            // Torso
             const torso = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.85, 0.35), tunicMat);
             torso.position.y = 0.95; pModel.add(torso);
 
@@ -397,6 +396,7 @@
             belt2.position.y = 0.95; belt2.rotation.z = -0.45;
             pModel.add(belt1, belt2);
 
+            // Head
             const headMesh = new THREE.Mesh(new THREE.SphereGeometry(0.2, 8, 8), skinMat);
             headMesh.position.y = 1.52; pModel.add(headMesh);
 
@@ -406,6 +406,7 @@
             helmetBrim.position.y = 1.58;
             pModel.add(helmetDome, helmetBrim);
 
+            // Legs
             const leftLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.11, 0.75), pantsMat);
             leftLeg.position.set(-0.18, 0.4, 0);
             const rightLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.11, 0.75), pantsMat);
@@ -417,6 +418,39 @@
             const rightBoot = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.12, 0.25), bootMat);
             rightBoot.position.set(0.18, 0.12, 0);
             pModel.add(leftBoot, rightBoot);
+
+            // 3rd Person Arms & Weapon Attachment Group
+            const leftArm = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.09, 0.75), tunicMat);
+            leftArm.position.set(-0.42, 1.0, 0.15);
+            leftArm.rotation.x = -Math.PI / 4;
+            pModel.add(leftArm);
+
+            const rightArm = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.09, 0.75), tunicMat);
+            rightArm.position.set(0.42, 1.0, 0.15);
+            rightArm.rotation.x = -Math.PI / 3;
+            pModel.add(rightArm);
+
+            // 3P Gun Mesh
+            const tpMusket = new THREE.Group();
+            const tpStock = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.12, 1.2), new THREE.MeshStandardMaterial({ color: 0x4a2e11 }));
+            const tpBarrel = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 1.4), ironMat);
+            tpBarrel.rotation.x = Math.PI / 2; tpBarrel.position.set(0, 0.05, -0.3);
+            tpMusket.add(tpStock, tpBarrel);
+            tpMusket.position.set(0.25, 0.85, -0.4);
+            tpMusket.rotation.x = -Math.PI / 12;
+            pModel.add(tpMusket);
+
+            // 3P Sword Mesh
+            const tpSword = new THREE.Group();
+            const tpBlade = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.9, 0.01), new THREE.MeshStandardMaterial({ color: 0xeeeeee, metalness: 0.95 }));
+            tpBlade.position.set(0, 0.45, 0);
+            tpSword.add(tpBlade);
+            tpSword.position.set(0.3, 0.7, -0.2);
+            tpSword.rotation.x = -Math.PI / 3;
+            tpSword.visible = false;
+            pModel.add(tpSword);
+
+            pModel.userData = { musket: tpMusket, sword: tpSword };
 
             return pModel;
         }
@@ -432,6 +466,7 @@
         player.add(cameraNode);
         cameraNode.add(camera);
 
+        // First Person Weapon Node
         const weaponNode = new THREE.Group();
         weaponNode.position.set(0.35, -0.3, -0.5);
         cameraNode.add(weaponNode);
@@ -451,14 +486,14 @@
         swordGroup.visible = false;
         weaponNode.add(swordGroup);
 
-        // Remote Player Setup
+        // Remote Player Model
         remotePlayerMesh = createSoldierMesh();
         remotePlayerMesh.visible = false;
         scene.add(remotePlayerMesh);
 
         let nametagSprite = null;
 
-        // Visual Effects: Gun Smoke Particle System
+        // Gun Smoke Particle System
         const smokeParticles = [];
         const smokeGeo = new THREE.SphereGeometry(0.28, 8, 8);
 
@@ -503,7 +538,7 @@
             }
         }
 
-        // 3D Hit Rings
+        // Hit FX
         const hitRings = [];
         const ringGeo = new THREE.RingGeometry(0.2, 0.65, 16);
 
@@ -533,7 +568,7 @@
             }
         }
 
-        // Input & Controls
+        // Controls
         let yaw = 0, pitch = 0;
         const input = { forward: 0, right: 0 };
         const keys = {};
@@ -625,7 +660,7 @@
         });
         window.addEventListener('keyup', e => keys[e.code] = false);
 
-        // Network Integration
+        // Network System
         function initPeer(customId = null) {
             peer = customId ? new Peer(customId) : new Peer();
             peer.on('connection', (c) => {
@@ -681,6 +716,12 @@
                     STATE.remoteIsDead = data.isDead;
                     remotePlayerMesh.visible = !data.isDead;
 
+                    // Sync remote player weapon visuals
+                    if (remotePlayerMesh.userData.musket && remotePlayerMesh.userData.sword) {
+                        remotePlayerMesh.userData.musket.visible = (data.equippedWeapon === 'musket');
+                        remotePlayerMesh.userData.sword.visible = (data.equippedWeapon === 'sword');
+                    }
+
                     if (!isHost && data.zulus) {
                         syncZulusFromHost(data.zulus);
                     }
@@ -692,6 +733,11 @@
                             }
                         });
                     }
+                } else if (data.type === 'WAVE_START') {
+                    STATE.wave = data.wave;
+                    document.getElementById('wave-val').innerText = STATE.wave;
+                    resetBarricades();
+                    showWaveBanner(`WAVE ${STATE.wave}`, `DEFEND THE PASS`);
                 } else if (data.type === 'HIT_ZULU') {
                     if (isHost) {
                         damageZulu(data.zuluId, data.damage, data.hitPos ? new THREE.Vector3(data.hitPos.x, data.hitPos.y, data.hitPos.z) : null);
@@ -710,7 +756,8 @@
                     y: player.position.y,
                     z: player.position.z,
                     yaw: yaw,
-                    isDead: STATE.isDead
+                    isDead: STATE.isDead,
+                    equippedWeapon: STATE.weapon
                 };
 
                 if (isHost) {
@@ -736,7 +783,7 @@
             if (isHost || !conn) startWave(1);
         }
 
-        // Enemy Management & Hitboxes
+        // Enemies & Hitboxes
         const zulus = [];
         const zuluMat = new THREE.MeshStandardMaterial({ color: 0x6e3b23, roughness: 0.85 });
 
@@ -755,13 +802,11 @@
 
             const zId = id !== null ? id : zuluIdCounter++;
 
-            // Precise Head Hitbox (1-shot kill zone)
             const headHitbox = new THREE.Mesh(new THREE.SphereGeometry(0.32, 8, 8), new THREE.MeshBasicMaterial({ visible: false }));
             headHitbox.position.y = 2.1;
             headHitbox.userData = { zuluId: zId, part: 'head' };
             group.add(headHitbox);
 
-            // Precise Body Hitbox (2-shot kill zone)
             const bodyHitbox = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.38, 1.4, 8), new THREE.MeshBasicMaterial({ visible: false }));
             bodyHitbox.position.y = 1.2;
             bodyHitbox.userData = { zuluId: zId, part: 'body' };
@@ -830,18 +875,32 @@
             STATE.zulusToSpawnInWave = 4 + num * 4;
             STATE.zulusRemainingInWave = STATE.zulusToSpawnInWave;
             STATE.waveActive = false;
-            resetBarricades(); // Barricades respawn every wave
+            resetBarricades();
             document.getElementById('wave-val').innerText = STATE.wave;
             showWaveBanner(`WAVE ${num}`, `DEFEND THE PASS`);
+
+            if (conn && conn.open && isHost) {
+                conn.send({ type: 'WAVE_START', wave: num });
+            }
+
             setTimeout(() => { STATE.waveActive = true; }, 2500);
         }
 
         function switchWeapon() {
             if (STATE.reloading || STATE.isDead) return;
             STATE.weapon = STATE.weapon === 'musket' ? 'sword' : 'musket';
-            musketGroup.visible = STATE.weapon === 'musket';
-            swordGroup.visible = STATE.weapon === 'sword';
-            document.getElementById('weapon-val').innerText = STATE.weapon === 'musket' ? 'MARTINI-HENRY' : 'SWORD';
+            
+            // FP visual update
+            musketGroup.visible = (STATE.weapon === 'musket');
+            swordGroup.visible = (STATE.weapon === 'sword');
+
+            // TP visual update
+            if (playerModel.userData.musket && playerModel.userData.sword) {
+                playerModel.userData.musket.visible = (STATE.weapon === 'musket');
+                playerModel.userData.sword.visible = (STATE.weapon === 'sword');
+            }
+
+            document.getElementById('weapon-val').innerText = (STATE.weapon === 'musket') ? 'MARTINI-HENRY' : 'SWORD';
         }
 
         function showHitFeedback() {
@@ -987,7 +1046,7 @@
                         if (!checkMountainCollision(nextPos)) player.position.copy(nextPos);
                     }
 
-                    // Direct Damage Detection (Now 2x damage rate)
+                    // Zulu Player Damage Logic (2x rate)
                     zulus.forEach(z => {
                         const dx = player.position.x - z.group.position.x;
                         const dz = player.position.z - z.group.position.z;
@@ -1037,7 +1096,7 @@
 
                         const dir = targetPos.clone().sub(z.group.position); dir.y = 0;
 
-                        // Barricade Collision & 3-Second Break Timer Logic
+                        // Barricade Destruction (3s Touch Rule)
                         let blockedByBarricade = false;
                         for (let b of barricades) {
                             if (!b.active) continue;
@@ -1056,7 +1115,6 @@
 
                         if (!blockedByBarricade && dir.length() > 1.2) {
                             dir.normalize();
-                            // Move at player speed (0.10)
                             z.group.position.addScaledVector(dir, CONFIG.baseSpeed);
                             z.group.lookAt(z.group.position.x + dir.x, z.group.position.y, z.group.position.z + dir.z);
                             z.group.rotation.z = Math.sin(time * 12 + z.animOffset) * 0.08;
@@ -1064,7 +1122,6 @@
                     });
                 }
 
-                // Lobby Wipe Check
                 if (conn && conn.open) {
                     if (STATE.isDead && STATE.remoteIsDead) triggerGameOver();
                 } else {
