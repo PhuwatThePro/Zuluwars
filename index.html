@@ -644,7 +644,7 @@
             }
         }
 
-        // Controls
+        // Controls & Pointer Lock
         let yaw = 0, pitch = 0;
         const input = { forward: 0, right: 0 };
         const keys = {};
@@ -656,600 +656,699 @@
         });
 
         document.addEventListener('mousemove', (e) => {
-            if (document.pointerLockElement === renderer.domElement || document.pointerLockElement === document.body) {
+            if (document.pointerLockElement === renderer.domElement && !STATE.isDead && !STATE.settingsOpen) {
                 yaw -= e.movementX * 0.0025;
                 pitch -= e.movementY * 0.0025;
-                pitch = Math.max(-Math.PI / 2.3, Math.min(Math.PI / 2.3, pitch));
+                pitch = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, pitch));
             }
         });
 
-        const touchLookZone = document.getElementById('touch-look');
-        let lookTouchId = null;
-        let lastTouchX = 0, lastTouchY = 0;
+        document.addEventListener('keydown', (e) => {
+            keys[e.code] = true;
+            if (e.code === 'KeyR') reloadWeapon();
+            if (e.code === 'Digit1') switchWeapon('musket');
+            if (e.code === 'Digit2') switchWeapon('sword');
+            if (e.code === 'KeyQ') switchWeapon(STATE.weapon === 'musket' ? 'sword' : 'musket');
+            if (e.code === 'Escape' && STATE.gameStarted) toggleSettings();
+        });
 
-        touchLookZone.addEventListener('touchstart', (e) => {
-            for (let t of e.changedTouches) {
-                if (lookTouchId === null) {
-                    lookTouchId = t.identifier;
-                    lastTouchX = t.clientX; lastTouchY = t.clientY;
-                }
-            }
-        }, { passive: false });
+        document.addEventListener('keyup', (e) => {
+            keys[e.code] = false;
+        });
 
-        window.addEventListener('touchmove', (e) => {
-            for (let t of e.changedTouches) {
-                if (t.identifier === lookTouchId) {
-                    yaw -= (t.clientX - lastTouchX) * 0.005;
-                    pitch -= (t.clientY - lastTouchY) * 0.005;
-                    pitch = Math.max(-Math.PI / 2.3, Math.min(Math.PI / 2.3, pitch));
-                    lastTouchX = t.clientX; lastTouchY = t.clientY;
-                }
-            }
-        }, { passive: false });
-
-        window.addEventListener('touchend', (e) => {
-            for (let t of e.changedTouches) {
-                if (t.identifier === lookTouchId) lookTouchId = null;
+        document.addEventListener('mousedown', (e) => {
+            if (e.button === 0 && document.pointerLockElement === renderer.domElement) {
+                attack();
             }
         });
 
+        // Touch Controls
+        const touchLook = document.getElementById('touch-look');
+        let touchStartX = 0, touchStartY = 0;
+
+        touchLook.addEventListener('touchstart', (e) => {
+            if (e.touches.length > 0) {
+                touchStartX = e.touches[0].clientX;
+                touchStartY = e.touches[0].clientY;
+            }
+        });
+
+        touchLook.addEventListener('touchmove', (e) => {
+            if (e.touches.length > 0 && !STATE.isDead) {
+                const dx = e.touches[0].clientX - touchStartX;
+                const dy = e.touches[0].clientY - touchStartY;
+                yaw -= dx * 0.005;
+                pitch -= dy * 0.005;
+                pitch = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, pitch));
+                touchStartX = e.touches[0].clientX;
+                touchStartY = e.touches[0].clientY;
+            }
+        });
+
+        // Mobile Joystick
         const joystickBound = document.getElementById('joystick-bound');
         const joystickThumb = document.getElementById('joystick-thumb');
-        let joyTouchId = null;
-
-        function updateJoystick(t) {
-            const rect = joystickBound.getBoundingClientRect();
-            let dx = t.clientX - (rect.left + 60);
-            let dy = t.clientY - (rect.top + 60);
-            const dist = Math.sqrt(dx * dx + dy * dy);
-            const maxR = 40;
-            if (dist > maxR) { dx = (dx / dist) * maxR; dy = (dy / dist) * maxR; }
-            joystickThumb.style.transform = `translate(${dx}px, ${dy}px)`;
-            input.right = dx / maxR;
-            input.forward = -dy / maxR;
-        }
+        let joystickActive = false;
+        let joystickCenter = { x: 0, y: 0 };
 
         joystickBound.addEventListener('touchstart', (e) => {
-            for (let t of e.changedTouches) {
-                if (joyTouchId === null) { joyTouchId = t.identifier; updateJoystick(t); }
-            }
-        }, { passive: false });
-
-        window.addEventListener('touchmove', (e) => {
-            for (let t of e.changedTouches) {
-                if (t.identifier === joyTouchId) updateJoystick(t);
-            }
-        }, { passive: false });
-
-        window.addEventListener('touchend', (e) => {
-            for (let t of e.changedTouches) {
-                if (t.identifier === joyTouchId) {
-                    joyTouchId = null; input.forward = 0; input.right = 0;
-                    joystickThumb.style.transform = `translate(0px, 0px)`;
-                }
-            }
+            joystickActive = true;
+            const rect = joystickBound.getBoundingClientRect();
+            joystickCenter = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
         });
 
-        window.addEventListener('keydown', e => {
-            keys[e.code] = true;
-            if (e.code === 'KeyQ' || e.code === 'KeyE') switchWeapon();
+        joystickBound.addEventListener('touchmove', (e) => {
+            if (!joystickActive) return;
+            const touch = e.touches[0];
+            const dx = touch.clientX - joystickCenter.x;
+            const dy = touch.clientY - joystickCenter.y;
+            const dist = Math.min(Math.hypot(dx, dy), 40);
+            const angle = Math.atan2(dy, dx);
+            
+            joystickThumb.style.transform = `translate(${Math.cos(angle) * dist}px, ${Math.sin(angle) * dist}px)`;
+            
+            input.right = (Math.cos(angle) * dist) / 40;
+            input.forward = -(Math.sin(angle) * dist) / 40;
         });
-        window.addEventListener('keyup', e => keys[e.code] = false);
 
-        // Network System
-        function initPeer(customId = null) {
-            peer = customId ? new Peer(customId) : new Peer();
-            peer.on('connection', (c) => {
-                conn = c;
-                setupNetwork();
-            });
+        const resetJoystick = () => {
+            joystickActive = false;
+            joystickThumb.style.transform = 'translate(0px, 0px)';
+            input.forward = 0;
+            input.right = 0;
+        };
+
+        joystickBound.addEventListener('touchend', resetJoystick);
+        joystickBound.addEventListener('touchcancel', resetJoystick);
+
+        document.getElementById('btn-attack').addEventListener('click', attack);
+        document.getElementById('btn-switch').addEventListener('click', () => {
+            switchWeapon(STATE.weapon === 'musket' ? 'sword' : 'musket');
+        });
+
+        // Weapon Handling
+        function switchWeapon(type) {
+            if (STATE.reloading) return;
+            STATE.weapon = type;
+            if (type === 'musket') {
+                musketGroup.visible = true;
+                swordGroup.visible = false;
+                document.getElementById('weapon-val').innerText = 'MARTINI-HENRY';
+                document.getElementById('ammo-val').innerText = 'READY';
+            } else {
+                musketGroup.visible = false;
+                swordGroup.visible = true;
+                document.getElementById('weapon-val').innerText = 'OFFICER SWORD';
+                document.getElementById('ammo-val').innerText = 'MELEE';
+            }
+            updateHUD();
         }
 
-        function createRoom() {
-            playerName = document.getElementById('player-name').value || "Host";
-            const code = Math.floor(1000 + Math.random() * 9000);
-            isHost = true;
-            initPeer(`frontier-pass-${code}`);
+        function reloadWeapon() {
+            if (STATE.weapon !== 'musket' || STATE.reloading) return;
+            STATE.reloading = true;
+            document.getElementById('ammo-val').innerText = 'RELOADING...';
+            const barContainer = document.getElementById('reload-bar-container');
+            const bar = document.getElementById('reload-bar');
+            barContainer.style.display = 'block';
+            bar.style.width = '0%';
 
-            document.getElementById('room-code-badge').style.display = 'block';
-            document.getElementById('room-code-val').innerText = code;
-            document.getElementById('network-status').innerText = "HOSTING (WAITING)";
-            startGame();
-        }
+            let start = performance.now();
+            const duration = CONFIG.musketCooldown;
 
-        function joinRoom() {
-            playerName = document.getElementById('player-name').value || "Client";
-            const code = document.getElementById('room-code-input').value;
-            if (code.length !== 4) return alert("Enter a valid 4-digit room code.");
+            function animateReload(now) {
+                let elapsed = now - start;
+                let pct = Math.min(100, (elapsed / duration) * 100);
+                bar.style.width = pct + '%';
 
-            initPeer();
-            peer.on('open', () => {
-                conn = peer.connect(`frontier-pass-${code}`);
-                setupNetwork();
-            });
-
-            document.getElementById('network-status').innerText = "CONNECTING...";
-            startGame();
-        }
-
-        function setupNetwork() {
-            conn.on('open', () => {
-                document.getElementById('network-status').innerText = `ONLINE (${GAME_VERSION})`;
-                remotePlayerMesh.visible = true;
-                setInterval(sendNetworkPacket, 50);
-                conn.send({ type: 'HANDSHAKE', name: playerName, version: GAME_VERSION });
-            });
-
-            conn.on('data', (data) => {
-                if (data.type === 'HANDSHAKE') {
-                    remotePlayerName = data.name;
-                    if (nametagSprite) remotePlayerMesh.remove(nametagSprite);
-                    nametagSprite = createNametagSprite(remotePlayerName);
-                    remotePlayerMesh.add(nametagSprite);
-                } else if (data.type === 'SYNC') {
-                    remotePlayerMesh.position.set(data.x, data.y, data.z);
-                    remotePlayerMesh.rotation.y = data.yaw;
-                    STATE.remoteIsDead = data.isDead;
-                    STATE.remoteIsMoving = data.isMoving;
-                    STATE.remoteWeapon = data.equippedWeapon;
-                    remotePlayerMesh.visible = !data.isDead;
-
-                    if (!isHost && data.zulus) {
-                        syncZulusFromHost(data.zulus);
-                    }
-                    if (!isHost && data.barricades) {
-                        data.barricades.forEach((act, idx) => {
-                            if (barricades[idx]) {
-                                barricades[idx].active = act;
-                                barricades[idx].mesh.visible = act;
-                            }
-                        });
-                    }
-                } else if (data.type === 'WAVE_START') {
-                    STATE.wave = data.wave;
-                    document.getElementById('wave-val').innerText = STATE.wave;
-                    resetBarricades();
-                    showWaveBanner(`WAVE ${STATE.wave}`, `DEFEND THE PASS`);
-                } else if (data.type === 'HIT_ZULU') {
-                    if (isHost) {
-                        damageZulu(data.zuluId, data.damage, data.hitPos ? new THREE.Vector3(data.hitPos.x, data.hitPos.y, data.hitPos.z) : null);
-                    }
-                } else if (data.type === 'SMOKE_FX') {
-                    spawnGunSmoke(new THREE.Vector3(data.x, data.y, data.z), new THREE.Vector3(data.dx, data.dy, data.dz));
+                if (elapsed < duration) {
+                    requestAnimationFrame(animateReload);
+                } else {
+                    STATE.reloading = false;
+                    barContainer.style.display = 'none';
+                    document.getElementById('ammo-val').innerText = 'READY';
                 }
-            });
+            }
+            requestAnimationFrame(animateReload);
         }
 
-        function sendNetworkPacket() {
-            if (conn && conn.open) {
-                const packet = {
-                    type: 'SYNC',
-                    x: player.position.x,
-                    y: player.position.y,
-                    z: player.position.z,
-                    yaw: yaw,
-                    isDead: STATE.isDead,
-                    isMoving: STATE.isMoving,
-                    equippedWeapon: STATE.weapon
-                };
+        // Combat Mechanics
+        const raycaster = new THREE.Raycaster();
 
-                if (isHost) {
-                    packet.zulus = zulus.map(z => ({ id: z.id, x: z.group.position.x, z: z.group.position.z, hp: z.hp }));
-                    packet.barricades = barricades.map(b => b.active);
+        function attack() {
+            const now = performance.now();
+            if (STATE.isDead || STATE.gameOver || !STATE.gameStarted) return;
+
+            if (STATE.weapon === 'musket') {
+                if (STATE.reloading || now - STATE.lastAttackTime < CONFIG.musketCooldown) return;
+                STATE.lastAttackTime = now;
+
+                cameraNode.position.z += 0.15;
+                setTimeout(() => { cameraNode.position.z = 0; }, 100);
+
+                const dir = new THREE.Vector3();
+                camera.getWorldDirection(dir);
+                const muzzlePos = player.position.clone().add(new THREE.Vector3(0, 1.4, 0)).add(dir.clone().multiplyScalar(0.8));
+                spawnGunSmoke(muzzlePos, dir);
+
+                if (conn && conn.open) {
+                    conn.send({ type: 'ATT', weapon: 'musket', pos: muzzlePos, dir: dir });
                 }
 
-                conn.send(packet);
+                raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+                const targetMeshes = zulus.map(z => z.mesh);
+                const intersects = raycaster.intersectObjects(targetMeshes, true);
+
+                if (intersects.length > 0) {
+                    const hitObj = intersects[0].object;
+                    const hitPoint = intersects[0].point;
+                    spawnHitRing(hitPoint);
+                    showHitIndicator();
+
+                    let hitZulu = zulus.find(z => z.mesh === hitObj || isDescendant(hitObj, z.mesh));
+                    if (hitZulu) {
+                        damageZulu(hitZulu, 100);
+                    }
+                }
+
+                reloadWeapon();
+            } else if (STATE.weapon === 'sword') {
+                if (now - STATE.lastAttackTime < CONFIG.swordCooldown) return;
+                STATE.lastAttackTime = now;
+
+                swordGroup.rotation.x = 0;
+                swordGroup.rotation.y = -Math.PI / 4;
+                setTimeout(() => {
+                    swordGroup.rotation.x = -Math.PI / 3;
+                    swordGroup.rotation.y = 0;
+                }, 200);
+
+                if (conn && conn.open) {
+                    conn.send({ type: 'ATT', weapon: 'sword' });
+                }
+
+                let hitAny = false;
+                zulus.forEach(z => {
+                    if (z.hp > 0 && player.position.distanceTo(z.mesh.position) <= CONFIG.swordRange) {
+                        const dirToZulu = z.mesh.position.clone().sub(player.position).normalize();
+                        const camDir = new THREE.Vector3();
+                        camera.getWorldDirection(camDir);
+                        if (camDir.dot(dirToZulu) > 0.4) {
+                            spawnHitRing(z.mesh.position.clone().add(new THREE.Vector3(0, 1, 0)));
+                            damageZulu(z, 100);
+                            hitAny = true;
+                        }
+                    }
+                });
+                if (hitAny) showHitIndicator();
             }
         }
 
-        function startGame() {
-            document.getElementById('lobby-modal').style.display = 'none';
-            document.body.style.backgroundImage = 'none';
-            document.body.style.backgroundColor = '#000';
-            
-            document.getElementById('canvas-container').style.display = 'block';
-            document.getElementById('ui-layer').style.display = 'flex';
-            document.getElementById('controls-layer').style.display = 'block';
-            document.getElementById('crosshair').style.display = 'block';
-            
-            STATE.gameStarted = true;
-            if (isHost || !conn) startWave(1);
+        function isDescendant(child, parent) {
+            let obj = child.parent;
+            while (obj) {
+                if (obj === parent) return true;
+                obj = obj.parent;
+            }
+            return false;
         }
 
-        // Enemies & Hitboxes
+        function showHitIndicator() {
+            const ind = document.getElementById('hit-indicator');
+            ind.style.opacity = '1';
+            setTimeout(() => { ind.style.opacity = '0'; }, 150);
+        }
+
+        // Enemy Zulu System
         const zulus = [];
-        const zuluMat = new THREE.MeshStandardMaterial({ color: 0x6e3b23, roughness: 0.85 });
+        const zuluBodyMat = new THREE.MeshStandardMaterial({ color: 0x4a2e1b, roughness: 0.8 });
+        const zuluSkirtMat = new THREE.MeshStandardMaterial({ color: 0xc8ad7f, roughness: 0.9 });
+        const zuluShieldMat = new THREE.MeshStandardMaterial({ color: 0xeeeeee, roughness: 0.6 });
 
-        function createZulu(id = null, x = null, z = null) {
-            const group = new THREE.Group();
-            const body = new THREE.Mesh(new THREE.CylinderGeometry(0.38, 0.35, 1.4), zuluMat);
-            body.position.y = 1.2; group.add(body);
-            const head = new THREE.Mesh(new THREE.SphereGeometry(0.28, 8, 8), zuluMat);
-            head.position.y = 2.1; group.add(head);
+        function createZuluMesh() {
+            const zGroup = new THREE.Group();
 
-            const shield = new THREE.Mesh(new THREE.BoxGeometry(0.6, 1.3, 0.05), new THREE.MeshStandardMaterial({ color: 0xd9c8a9 }));
-            shield.position.set(-0.4, 1.2, 0.3); group.add(shield);
+            const torso = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.8, 0.3), zuluBodyMat);
+            torso.position.y = 0.9; zGroup.add(torso);
 
-            const spearShaft = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 2.2), new THREE.MeshStandardMaterial({ color: 0x4a2e11 }));
-            spearShaft.rotation.x = Math.PI / 2; spearShaft.position.set(0.4, 1.2, 0.4); group.add(spearShaft);
+            const skirt = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.4, 0.35, 8), zuluSkirtMat);
+            skirt.position.y = 0.5; zGroup.add(skirt);
 
-            const zId = id !== null ? id : zuluIdCounter++;
+            const head = new THREE.Mesh(new THREE.SphereGeometry(0.2, 8, 8), zuluBodyMat);
+            head.position.y = 1.45; zGroup.add(head);
 
-            const headHitbox = new THREE.Mesh(new THREE.SphereGeometry(0.32, 8, 8), new THREE.MeshBasicMaterial({ visible: false }));
-            headHitbox.position.y = 2.1;
-            headHitbox.userData = { zuluId: zId, part: 'head' };
-            group.add(headHitbox);
+            const lLegPivot = new THREE.Group(); lLegPivot.position.set(-0.16, 0.5, 0);
+            const lLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.08, 0.5), zuluBodyMat);
+            lLeg.position.y = -0.25; lLegPivot.add(lLeg); zGroup.add(lLegPivot);
 
-            const bodyHitbox = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.38, 1.4, 8), new THREE.MeshBasicMaterial({ visible: false }));
-            bodyHitbox.position.y = 1.2;
-            bodyHitbox.userData = { zuluId: zId, part: 'body' };
-            group.add(bodyHitbox);
+            const rLegPivot = new THREE.Group(); rLegPivot.position.set(0.16, 0.5, 0);
+            const rLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.08, 0.5), zuluBodyMat);
+            rLeg.position.y = -0.25; rLegPivot.add(rLeg); zGroup.add(rLegPivot);
 
-            const posX = x !== null ? x : (Math.random() - 0.5) * 36;
-            const posZ = z !== null ? z : (-45 - Math.random() * 10);
+            const lArmPivot = new THREE.Group(); lArmPivot.position.set(-0.35, 1.2, 0);
+            const lArm = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.07, 0.55), zuluBodyMat);
+            lArm.position.y = -0.275; lArmPivot.add(lArm); zGroup.add(lArmPivot);
 
-            group.position.set(posX, 0, posZ);
-            scene.add(group);
+            const rArmPivot = new THREE.Group(); rArmPivot.position.set(0.35, 1.2, 0);
+            const rArm = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.07, 0.55), zuluBodyMat);
+            rArm.position.y = -0.275; rArmPivot.add(rArm); zGroup.add(rArmPivot);
 
-            const zObj = { id: zId, group: group, headHitbox: headHitbox, bodyHitbox: bodyHitbox, hp: 2, animOffset: Math.random() * 10 };
+            const shield = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.9, 0.04), zuluShieldMat);
+            shield.position.set(0, -0.2, 0.2); lArmPivot.add(shield);
+
+            const spearShaft = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 1.6), new THREE.MeshStandardMaterial({ color: 0x3d2314 }));
+            spearShaft.rotation.x = Math.PI / 2; spearShaft.position.set(0, -0.2, 0.4);
+            const spearTip = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.25, 4), ironMat);
+            spearTip.rotation.x = Math.PI / 2; spearTip.position.set(0, -0.2, 1.2);
+            rArmPivot.add(spearShaft, spearTip);
+
+            zGroup.userData = { leftLeg: lLegPivot, rightLeg: rLegPivot, leftArm: lArmPivot, rightArm: rArmPivot };
+            return zGroup;
+        }
+
+        function spawnZulu(id, x, z) {
+            const zMesh = createZuluMesh();
+            zMesh.position.set(x, 0, z);
+            scene.add(zMesh);
+
+            const zObj = {
+                id: id,
+                mesh: zMesh,
+                hp: 100,
+                speed: 0.045 + Math.random() * 0.02,
+                lastAttackTime: 0
+            };
             zulus.push(zObj);
             return zObj;
         }
 
-        function syncZulusFromHost(hostZulus) {
-            const hostIds = hostZulus.map(hz => hz.id);
-            for (let i = zulus.length - 1; i >= 0; i--) {
-                if (!hostIds.includes(zulus[i].id)) {
-                    scene.remove(zulus[i].group);
-                    zulus.splice(i, 1);
+        function damageZulu(zulu, amount) {
+            zulu.hp -= amount;
+            if (zulu.hp <= 0) {
+                scene.remove(zulu.mesh);
+                const idx = zulus.indexOf(zulu);
+                if (idx !== -1) zulus.splice(idx, 1);
+
+                STATE.score++;
+                updateHUD();
+
+                if (isHost) {
+                    STATE.zulusRemainingInWave--;
+                    if (conn && conn.open) {
+                        conn.send({ type: 'ZD', id: zulu.id });
+                    }
+                    checkWaveProgress();
+                } else {
+                    if (conn && conn.open) {
+                        conn.send({ type: 'ZH', id: zulu.id, damage: amount });
+                    }
                 }
             }
+        }
 
-            hostZulus.forEach(hz => {
-                let z = zulus.find(item => item.id === hz.id);
-                if (!z) {
-                    z = createZulu(hz.id, hz.x, hz.z);
-                } else {
-                    z.group.position.x = hz.x;
-                    z.group.position.z = hz.z;
-                    z.hp = hz.hp;
+        function updateZulus(delta, time) {
+            zulus.forEach(z => {
+                if (z.hp <= 0) return;
+
+                let targetPos = player.position.clone();
+                if (STATE.isDead && remotePlayerMesh.visible) {
+                    targetPos = remotePlayerMesh.position.clone();
+                } else if (!STATE.isDead && remotePlayerMesh.visible && !STATE.remoteIsDead) {
+                    const distLocal = player.position.distanceTo(z.mesh.position);
+                    const distRemote = remotePlayerMesh.position.distanceTo(z.mesh.position);
+                    if (distRemote < distLocal) targetPos = remotePlayerMesh.position.clone();
+                }
+
+                const dir = targetPos.clone().sub(z.mesh.position);
+                dir.y = 0;
+                const dist = dir.length();
+                dir.normalize();
+
+                z.mesh.rotation.y = Math.atan2(dir.x, dir.z);
+
+                let blockedByBarricade = false;
+                for (let b of barricades) {
+                    if (!b.active) continue;
+                    const bDist = z.mesh.position.distanceTo(new THREE.Vector3(b.x, 0, b.z));
+                    if (bDist < 1.4) {
+                        blockedByBarricade = true;
+                        b.touchTimer += delta;
+                        if (b.touchTimer > 2.5) {
+                            b.active = false;
+                            b.mesh.visible = false;
+                        }
+                        break;
+                    }
+                }
+
+                if (!blockedByBarricade && dist > 1.2) {
+                    const newPos = z.mesh.position.clone().addScaledVector(dir, z.speed);
+                    z.mesh.position.copy(newPos);
+
+                    const cycle = Math.sin(time * 12 + z.id);
+                    z.mesh.userData.leftLeg.rotation.x = cycle * 0.5;
+                    z.mesh.userData.rightLeg.rotation.x = -cycle * 0.5;
+                } else if (dist <= 1.3 && !STATE.isDead) {
+                    const now = performance.now();
+                    if (now - z.lastAttackTime > 1500) {
+                        z.lastAttackTime = now;
+                        STATE.hp = Math.max(0, STATE.hp - CONFIG.zuluDamage);
+                        updateHUD();
+                        if (STATE.hp <= 0) {
+                            handleLocalDeath();
+                        }
+                    }
                 }
             });
         }
 
+        // Wave Manager
+        let spawnTimer = null;
+
+        function startWave(waveNum) {
+            STATE.wave = waveNum;
+            STATE.waveActive = true;
+            STATE.zulusToSpawnInWave = 6 + waveNum * 5;
+            STATE.zulusRemainingInWave = STATE.zulusToSpawnInWave;
+
+            showWaveBanner(`WAVE ${waveNum}`, "DEFEND THE PASS");
+            updateHUD();
+
+            if (isHost) {
+                let spawnedCount = 0;
+                if (spawnTimer) clearInterval(spawnTimer);
+                
+                spawnTimer = setInterval(() => {
+                    if (!STATE.waveActive || STATE.gameOver) return;
+
+                    if (spawnedCount < STATE.zulusToSpawnInWave) {
+                        const spawnX = (Math.random() - 0.5) * 36;
+                        const spawnZ = -45 - Math.random() * 10;
+                        const zId = ++zuluIdCounter;
+                        
+                        spawnZulu(zId, spawnX, spawnZ);
+                        spawnedCount++;
+
+                        if (conn && conn.open) {
+                            conn.send({ type: 'S', id: zId, x: spawnX, z: spawnZ });
+                        }
+                    } else {
+                        clearInterval(spawnTimer);
+                    }
+                }, Math.max(800, CONFIG.baseSpawnInterval - waveNum * 150));
+            }
+        }
+
+        function checkWaveProgress() {
+            if (!isHost) return;
+            if (STATE.zulusRemainingInWave <= 0) {
+                STATE.waveActive = false;
+                resetBarricades();
+                setTimeout(() => {
+                    startWave(STATE.wave + 1);
+                    if (conn && conn.open) {
+                        conn.send({ type: 'W', wave: STATE.wave });
+                    }
+                }, 4000);
+            }
+        }
+
+        function showWaveBanner(title, sub) {
+            const banner = document.getElementById('wave-banner');
+            document.getElementById('wave-title').innerText = title;
+            document.getElementById('wave-subtitle').innerText = sub;
+            banner.style.opacity = '1';
+            setTimeout(() => { banner.style.opacity = '0'; }, 3000);
+        }
+
+        // Death & Game Over Logic
+        function handleLocalDeath() {
+            STATE.isDead = true;
+            playerModel.visible = false;
+            document.getElementById('spectator-msg').style.display = 'block';
+
+            if (conn && conn.open) {
+                conn.send({ type: 'P', dead: true, hp: 0 });
+            }
+
+            if (STATE.remoteIsDead || !conn) {
+                triggerGameOver();
+            }
+        }
+
+        function triggerGameOver() {
+            STATE.gameOver = true;
+            document.getElementById('final-wave').innerText = STATE.wave;
+            document.getElementById('final-score').innerText = STATE.score;
+            document.getElementById('game-over').style.display = 'flex';
+            if (document.exitPointerLock) document.exitPointerLock();
+
+            if (isHost && conn && conn.open) {
+                conn.send({ type: 'GO' });
+            }
+        }
+
+        function resetGame() {
+            STATE.hp = 100;
+            STATE.score = 0;
+            STATE.wave = 1;
+            STATE.gameOver = false;
+            STATE.isDead = false;
+            STATE.remoteIsDead = false;
+
+            document.getElementById('game-over').style.display = 'none';
+            document.getElementById('spectator-msg').style.display = 'none';
+
+            zulus.forEach(z => scene.remove(z.mesh));
+            zulus.length = 0;
+
+            player.position.set(0, 0, 0);
+            yaw = 0; pitch = 0;
+
+            resetBarricades();
+            updateHUD();
+
+            if (isHost) {
+                startWave(1);
+            }
+        }
+
+        // Networking
+        function initPeer(customId = null) {
+            peer = customId ? new Peer(customId) : new Peer();
+
+            peer.on('open', (id) => {
+                document.getElementById('network-status').innerText = 'CONNECTED TO NET';
+                if (isHost) {
+                    document.getElementById('room-code-badge').style.display = 'block';
+                    document.getElementById('room-code-val').innerText = id.substring(0, 4).toUpperCase();
+                }
+            });
+
+            peer.on('connection', (c) => {
+                conn = c;
+                setupConnection();
+            });
+
+            peer.on('error', (err) => {
+                console.error('Peer error:', err);
+                document.getElementById('network-status').innerText = 'NET ERROR';
+            });
+        }
+
+        function createRoom() {
+            playerName = document.getElementById('player-name').value || "Soldier";
+            isHost = true;
+            const roomId = "FD-" + Math.floor(1000 + Math.random() * 9000);
+            initPeer(roomId);
+
+            document.getElementById('lobby-modal').style.display = 'none';
+            document.getElementById('ui-layer').style.display = 'flex';
+            document.getElementById('canvas-container').style.display = 'block';
+            if (window.innerWidth <= 800) document.getElementById('controls-layer').style.display = 'block';
+
+            STATE.gameStarted = true;
+            startWave(1);
+        }
+
+        function joinRoom() {
+            playerName = document.getElementById('player-name').value || "Soldier";
+            const code = document.getElementById('room-code-input').value.trim();
+            if (code.length < 4) return alert("Enter valid 4-digit code!");
+
+            isHost = false;
+            const targetId = "FD-" + code;
+            initPeer();
+
+            peer.on('open', () => {
+                conn = peer.connect(targetId);
+                setupConnection();
+            });
+
+            document.getElementById('lobby-modal').style.display = 'none';
+            document.getElementById('ui-layer').style.display = 'flex';
+            document.getElementById('canvas-container').style.display = 'block';
+            if (window.innerWidth <= 800) document.getElementById('controls-layer').style.display = 'block';
+
+            STATE.gameStarted = true;
+        }
+
+        function setupConnection() {
+            document.getElementById('network-status').innerText = 'CO-OP ACTIVE';
+            
+            if (nametagSprite) remotePlayerMesh.remove(nametagSprite);
+            nametagSprite = createNametagSprite(remotePlayerName);
+            remotePlayerMesh.add(nametagSprite);
+            remotePlayerMesh.visible = true;
+
+            conn.on('data', (data) => {
+                if (data.type === 'P') {
+                    prevRemotePos.copy(remotePlayerMesh.position);
+                    remotePlayerMesh.position.set(data.x, data.y, data.z);
+                    remotePlayerMesh.rotation.y = data.yaw;
+                    STATE.remoteIsMoving = data.isMoving;
+                    STATE.remoteWeapon = data.weapon;
+                    STATE.remoteIsDead = data.dead;
+                    if (data.dead) remotePlayerMesh.visible = false;
+                } else if (data.type === 'S') {
+                    spawnZulu(data.id, data.x, data.z);
+                } else if (data.type === 'ZH' && isHost) {
+                    const z = zulus.find(item => item.id === data.id);
+                    if (z) damageZulu(z, data.damage);
+                } else if (data.type === 'ZD') {
+                    const z = zulus.find(item => item.id === data.id);
+                    if (z) {
+                        scene.remove(z.mesh);
+                        const idx = zulus.indexOf(z);
+                        if (idx !== -1) zulus.splice(idx, 1);
+                    }
+                } else if (data.type === 'W') {
+                    startWave(data.wave);
+                } else if (data.type === 'ATT') {
+                    if (data.weapon === 'musket' && data.pos && data.dir) {
+                        spawnGunSmoke(new THREE.Vector3(data.pos.x, data.pos.y, data.pos.z), new THREE.Vector3(data.dir.x, data.dir.y, data.dir.z));
+                    }
+                } else if (data.type === 'GO') {
+                    triggerGameOver();
+                }
+            });
+        }
+
+        function syncNetworkData() {
+            if (conn && conn.open && STATE.gameStarted) {
+                conn.send({
+                    type: 'P',
+                    x: player.position.x,
+                    y: player.position.y,
+                    z: player.position.z,
+                    yaw: yaw,
+                    pitch: pitch,
+                    isMoving: STATE.isMoving,
+                    weapon: STATE.weapon,
+                    dead: STATE.isDead,
+                    hp: STATE.hp
+                });
+            }
+        }
+
+        // Camera & UI
         function setCameraMode(mode) {
             STATE.cameraMode = mode;
+            document.getElementById('btn-cam-1p').classList.toggle('active', mode === '1P');
+            document.getElementById('btn-cam-3p').classList.toggle('active', mode === '3P');
+
             if (mode === '1P') {
-                camera.position.set(0, 0, 0);
                 playerModel.visible = false;
-                weaponNode.visible = !STATE.isDead;
+                weaponNode.visible = true;
+                document.getElementById('crosshair').style.display = 'block';
+                camera.position.set(0, 0, 0);
             } else {
-                camera.position.set(0, 0.6, 3.5);
-                playerModel.visible = !STATE.isDead;
+                playerModel.visible = true;
                 weaponNode.visible = false;
+                document.getElementById('crosshair').style.display = 'none';
             }
         }
 
         function toggleSettings() {
             STATE.settingsOpen = !STATE.settingsOpen;
             document.getElementById('settings-modal').style.display = STATE.settingsOpen ? 'flex' : 'none';
+            if (STATE.settingsOpen && document.exitPointerLock) {
+                document.exitPointerLock();
+            }
         }
 
-        function showWaveBanner(title, subtitle) {
-            const banner = document.getElementById('wave-banner');
-            document.getElementById('wave-title').innerText = title;
-            document.getElementById('wave-subtitle').innerText = subtitle;
-            banner.style.opacity = '1';
-            setTimeout(() => { banner.style.opacity = '0'; }, 2500);
-        }
-
-        function startWave(num) {
-            STATE.wave = num;
-            STATE.zulusToSpawnInWave = 4 + num * 4;
-            STATE.zulusRemainingInWave = STATE.zulusToSpawnInWave;
-            STATE.waveActive = false;
-            resetBarricades();
+        function updateHUD() {
+            document.getElementById('hp-val').innerText = STATE.hp;
+            document.getElementById('score-val').innerText = STATE.score;
             document.getElementById('wave-val').innerText = STATE.wave;
-            showWaveBanner(`WAVE ${num}`, `DEFEND THE PASS`);
-
-            if (conn && conn.open && isHost) {
-                conn.send({ type: 'WAVE_START', wave: num });
-            }
-
-            setTimeout(() => { STATE.waveActive = true; }, 2500);
         }
 
-        function switchWeapon() {
-            if (STATE.reloading || STATE.isDead) return;
-            STATE.weapon = STATE.weapon === 'musket' ? 'sword' : 'musket';
-            
-            // FP visual update
-            musketGroup.visible = (STATE.weapon === 'musket');
-            swordGroup.visible = (STATE.weapon === 'sword');
-
-            document.getElementById('weapon-val').innerText = (STATE.weapon === 'musket') ? 'MARTINI-HENRY' : 'SWORD';
-        }
-
-        function showHitFeedback() {
-            const ind = document.getElementById('hit-indicator');
-            ind.style.opacity = '1';
-            setTimeout(() => { ind.style.opacity = '0'; }, 90);
-        }
-
-        function damageZulu(zuluId, damageAmount, hitPoint = null) {
-            const idx = zulus.findIndex(z => z.id === zuluId);
-            if (idx === -1) return;
-
-            const z = zulus[idx];
-            z.hp -= damageAmount;
-            
-            showHitFeedback();
-            if (hitPoint) spawnHitRing(hitPoint);
-            else spawnHitRing(z.group.position.clone().add(new THREE.Vector3(0, 1.2, 0)));
-
-            if (z.hp <= 0) {
-                scene.remove(z.group);
-                zulus.splice(idx, 1);
-                STATE.score++;
-                STATE.zulusRemainingInWave--;
-                document.getElementById('score-val').innerText = STATE.score;
-
-                if (isHost && STATE.zulusRemainingInWave <= 0 && STATE.zulusToSpawnInWave <= 0) {
-                    STATE.waveActive = false;
-                    setTimeout(() => startWave(STATE.wave + 1), 3000);
-                }
-            }
-        }
-
-        function performAttack() {
-            const now = performance.now();
-            if (STATE.gameOver || !STATE.gameStarted || STATE.settingsOpen || STATE.isDead) return;
-
-            const dir = camera.getWorldDirection(new THREE.Vector3());
-
-            if (STATE.weapon === 'musket') {
-                if (STATE.reloading) return;
-                STATE.reloading = true;
-                STATE.lastAttackTime = now;
-                document.getElementById('reload-bar-container').style.display = 'block';
-
-                weaponNode.position.z += 0.25;
-                weaponNode.rotation.x += 0.25;
-
-                const originCamPos = camera.getWorldPosition(new THREE.Vector3());
-                spawnGunSmoke(originCamPos, dir);
-
-                if (conn && conn.open) {
-                    conn.send({ type: 'SMOKE_FX', x: originCamPos.x, y: originCamPos.y, z: originCamPos.z, dx: dir.x, dy: dir.y, dz: dir.z });
-                }
-
-                const hitboxes = [];
-                zulus.forEach(z => {
-                    if (z.headHitbox) hitboxes.push(z.headHitbox);
-                    if (z.bodyHitbox) hitboxes.push(z.bodyHitbox);
-                });
-
-                const raycaster = new THREE.Raycaster(camera.getWorldPosition(new THREE.Vector3()), dir);
-                const hits = raycaster.intersectObjects(hitboxes);
-                
-                if (hits.length > 0) {
-                    const hitObj = hits[0].object;
-                    const zuluId = hitObj.userData.zuluId;
-                    const part = hitObj.userData.part;
-                    const hitZulu = zulus.find(z => z.id === zuluId);
-                    
-                    if (hitZulu) {
-                        const damage = (part === 'head') ? 2 : 1;
-
-                        showHitFeedback();
-                        spawnHitRing(hits[0].point);
-
-                        if (isHost || !conn) {
-                            damageZulu(hitZulu.id, damage, hits[0].point);
-                        } else {
-                            conn.send({ type: 'HIT_ZULU', zuluId: hitZulu.id, damage: damage, hitPos: hits[0].point });
-                        }
-                    }
-                }
-            } else {
-                if (now - STATE.lastAttackTime < CONFIG.swordCooldown) return;
-                STATE.lastAttackTime = now;
-                swordGroup.rotation.z = -Math.PI / 1.5;
-
-                const camPos = camera.getWorldPosition(new THREE.Vector3());
-
-                for (let i = zulus.length - 1; i >= 0; i--) {
-                    const zPos = zulus[i].group.position.clone().add(new THREE.Vector3(0, 1.2, 0));
-                    if (camPos.distanceTo(zPos) < CONFIG.swordRange) {
-                        if (dir.dot(zPos.sub(camPos).normalize()) > 0.15) {
-                            showHitFeedback();
-                            spawnHitRing(zPos);
-
-                            if (isHost || !conn) {
-                                damageZulu(zulus[i].id, CONFIG.swordDamage, zPos);
-                            } else {
-                                conn.send({ type: 'HIT_ZULU', zuluId: zulus[i].id, damage: CONFIG.swordDamage, hitPos: zPos });
-                            }
-                            break;
-                        }
-                    }
-                }
-            }
-        }
-
-        document.getElementById('btn-attack').addEventListener('click', performAttack);
-        document.getElementById('btn-switch').addEventListener('click', switchWeapon);
-        window.addEventListener('mousedown', (e) => { 
-            if (e.button === 0 && STATE.gameStarted && document.pointerLockElement === renderer.domElement) {
-                performAttack();
-            } 
-        });
-
-        let lastSpawn = 0;
+        // Render Loop
         const clock = new THREE.Clock();
+        let netSyncTimer = 0;
 
         function animate() {
             requestAnimationFrame(animate);
-            if (!STATE.gameStarted) return;
 
-            const delta = clock.getDelta();
+            const delta = Math.min(clock.getDelta(), 0.1);
             const time = clock.getElapsedTime();
 
-            updateGunSmoke(delta);
-            updateHitRings(delta);
+            if (STATE.gameStarted && !STATE.gameOver) {
+                if (!STATE.isDead && !STATE.settingsOpen) {
+                    let moveX = 0, moveZ = 0;
+                    if (keys['KeyW']) moveZ -= 1;
+                    if (keys['KeyS']) moveZ += 1;
+                    if (keys['KeyA']) moveX -= 1;
+                    if (keys['KeyD']) moveX += 1;
 
-            if (!STATE.gameOver) {
-                if (!STATE.isDead) {
+                    if (input.forward !== 0 || input.right !== 0) {
+                        moveZ = -input.forward;
+                        moveX = input.right;
+                    }
+
+                    STATE.isMoving = (moveX !== 0 || moveZ !== 0);
+
+                    if (STATE.isMoving) {
+                        const moveVector = new THREE.Vector3(moveX, 0, moveZ).normalize();
+                        moveVector.applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
+
+                        const newPos = player.position.clone().addScaledVector(moveVector, CONFIG.baseSpeed);
+                        if (!checkMountainCollision(newPos)) {
+                            player.position.copy(newPos);
+                        }
+                    }
+
                     player.rotation.y = yaw;
                     cameraNode.rotation.x = pitch;
 
-                    let moveZ = input.forward + (keys['KeyW'] || keys['ArrowUp'] ? 1 : 0) - (keys['KeyS'] || keys['ArrowDown'] ? 1 : 0);
-                    let moveX = input.right + (keys['KeyD'] || keys['ArrowRight'] ? 1 : 0) - (keys['KeyA'] || keys['ArrowLeft'] ? 1 : 0);
-                    
-                    const moveDir = new THREE.Vector3(moveX, 0, -moveZ).normalize();
-                    STATE.isMoving = (moveDir.lengthSq() > 0.01);
-
-                    if (STATE.isMoving) {
-                        moveDir.applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
-                        const nextPos = player.position.clone().addScaledVector(moveDir, 0.1);
-                        if (!checkMountainCollision(nextPos)) player.position.copy(nextPos);
-                    }
-
-                    // Update Local 3rd Person Animations
                     updateCharacterPose(playerModel, STATE.isMoving, STATE.weapon, time, delta);
-
-                    // Zulu Player Damage Logic
-                    zulus.forEach(z => {
-                        const dx = player.position.x - z.group.position.x;
-                        const dz = player.position.z - z.group.position.z;
-                        if (dx * dx + dz * dz < 2.25) {
-                            STATE.hp -= CONFIG.zuluDamage * delta;
-                            document.getElementById('hp-val').innerText = Math.max(0, Math.ceil(STATE.hp));
-                            if (STATE.hp <= 0) handlePlayerDeath();
-                        }
-                    });
                 }
 
-                // Update Remote Player Animations
-                if (remotePlayerMesh && remotePlayerMesh.visible) {
+                if (STATE.isDead && remotePlayerMesh.visible) {
+                    camera.position.lerp(remotePlayerMesh.position.clone().add(new THREE.Vector3(0, 3, 5)), delta * 3);
+                    camera.lookAt(remotePlayerMesh.position);
+                } else if (STATE.cameraMode === '3P') {
+                    const targetCamPos = new THREE.Vector3(0, 0.8, 3.5);
+                    camera.position.lerp(targetCamPos, delta * 15);
+                    camera.lookAt(player.position.clone().add(new THREE.Vector3(0, 1.4, 0)));
+                }
+
+                if (remotePlayerMesh.visible) {
                     updateCharacterPose(remotePlayerMesh, STATE.remoteIsMoving, STATE.remoteWeapon, time, delta);
                 }
 
-                if (STATE.reloading) {
-                    const elapsed = performance.now() - STATE.lastAttackTime;
-                    const progress = Math.min(elapsed / CONFIG.musketCooldown, 1.0);
-                    document.getElementById('reload-bar').style.width = `${progress * 100}%`;
-                    if (progress >= 1.0) {
-                        STATE.reloading = false;
-                        document.getElementById('reload-bar-container').style.display = 'none';
-                    }
-                }
+                updateZulus(delta, time);
+                updateGunSmoke(delta);
+                updateHitRings(delta);
 
-                weaponNode.position.z += (-0.5 - weaponNode.position.z) * 0.12;
-                weaponNode.rotation.x += (0 - weaponNode.rotation.x) * 0.12;
-                if (STATE.weapon === 'sword') swordGroup.rotation.z += (0 - swordGroup.rotation.z) * 0.15;
-
-                // Spawning & Enemy AI
-                if ((isHost || !conn) && STATE.waveActive && STATE.zulusToSpawnInWave > 0 && performance.now() - lastSpawn > CONFIG.baseSpawnInterval) {
-                    createZulu();
-                    STATE.zulusToSpawnInWave--;
-                    lastSpawn = performance.now();
-                }
-
-                if (isHost || !conn) {
-                    zulus.forEach((z) => {
-                        let targetPos = player.position;
-                        let minDist = Infinity;
-
-                        if (!STATE.isDead) {
-                            const dHost = z.group.position.distanceTo(player.position);
-                            if (dHost < minDist) { minDist = dHost; targetPos = player.position; }
-                        }
-
-                        if (conn && conn.open && !STATE.remoteIsDead) {
-                            const dRemote = z.group.position.distanceTo(remotePlayerMesh.position);
-                            if (dRemote < minDist) { minDist = dRemote; targetPos = remotePlayerMesh.position; }
-                        }
-
-                        const dir = targetPos.clone().sub(z.group.position); dir.y = 0;
-
-                        // Barricade Destruction (3s Touch Rule)
-                        let blockedByBarricade = false;
-                        for (let b of barricades) {
-                            if (!b.active) continue;
-                            const dx = z.group.position.x - b.x;
-                            const dz = z.group.position.z - b.z;
-                            if (dx * dx + dz * dz < 1.44) {
-                                blockedByBarricade = true;
-                                b.touchTimer += delta;
-                                if (b.touchTimer >= 3.0) {
-                                    b.active = false;
-                                    b.mesh.visible = false;
-                                }
-                                break;
-                            }
-                        }
-
-                        if (!blockedByBarricade && dir.length() > 1.2) {
-                            dir.normalize();
-                            z.group.position.addScaledVector(dir, CONFIG.baseSpeed);
-                            z.group.lookAt(z.group.position.x + dir.x, z.group.position.y, z.group.position.z + dir.z);
-                            z.group.rotation.z = Math.sin(time * 12 + z.animOffset) * 0.08;
-                        }
-                    });
-                }
-
-                if (conn && conn.open) {
-                    if (STATE.isDead && STATE.remoteIsDead) triggerGameOver();
-                } else {
-                    if (STATE.isDead) triggerGameOver();
+                netSyncTimer += delta;
+                if (netSyncTimer > 0.033) {
+                    syncNetworkData();
+                    netSyncTimer = 0;
                 }
             }
+
             renderer.render(scene, camera);
-        }
-
-        function handlePlayerDeath() {
-            STATE.isDead = true;
-            document.getElementById('hp-val').innerText = 0;
-            document.getElementById('spectator-msg').style.display = 'block';
-            playerModel.visible = false;
-            weaponNode.visible = false;
-            if (document.exitPointerLock) document.exitPointerLock();
-
-            if (conn && conn.open && !STATE.remoteIsDead) {
-                remotePlayerMesh.add(cameraNode);
-                cameraNode.position.set(0, 3, 5);
-                cameraNode.rotation.x = -0.3;
-            }
-        }
-
-        function triggerGameOver() {
-            STATE.gameOver = true;
-            if (document.exitPointerLock) document.exitPointerLock();
-            document.getElementById('spectator-msg').style.display = 'none';
-            document.getElementById('final-wave').innerText = STATE.wave;
-            document.getElementById('final-score').innerText = STATE.score;
-            document.getElementById('game-over').style.display = 'flex';
-        }
-
-        function resetGame() {
-            zulus.forEach(z => scene.remove(z.group));
-            zulus.length = 0;
-            STATE.hp = 100; STATE.score = 0; STATE.gameOver = false; STATE.isDead = false; STATE.reloading = false;
-            
-            player.add(cameraNode);
-            cameraNode.position.set(0, 1.6, 0);
-            cameraNode.rotation.set(0, 0, 0);
-            player.position.set(0, 0, 0);
-
-            document.getElementById('hp-val').innerText = 100;
-            document.getElementById('score-val').innerText = 0;
-            document.getElementById('spectator-msg').style.display = 'none';
-            document.getElementById('game-over').style.display = 'none';
-
-            resetBarricades();
-            setCameraMode(STATE.cameraMode);
-            if (isHost || !conn) startWave(1);
         }
 
         animate();
