@@ -1,0 +1,260 @@
+name: Apply Zulu and weapon fixes
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Patch standalone game
+        shell: python
+        run: |
+          from pathlib import Path
+          p = Path('index.html')
+          s = p.read_text(encoding='utf-8')
+
+          # 1) Longer Zulu spear with a visible steel spearhead, projecting in the same
+          # direction as the Zulu model's visual front (+Z).
+          old = '''            const spearShaft = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 2.2), new THREE.MeshStandardMaterial({ color: 0x4a2e11 }));
+            spearShaft.rotation.x = Math.PI / 2; spearShaft.position.set(0.4, 1.2, 0.4); group.add(spearShaft);
+'''
+          new = '''            const spearWoodMat = new THREE.MeshStandardMaterial({ color: 0x4a2e11, roughness: 0.88 });
+            const spearSteelMat = new THREE.MeshStandardMaterial({ color: 0xbfc4c4, metalness: 0.9, roughness: 0.22 });
+
+            const spearShaft = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.023, 0.028, 3.6, 8),
+                spearWoodMat
+            );
+            spearShaft.rotation.x = Math.PI / 2;
+            spearShaft.position.set(0.4, 1.2, 1.05);
+            group.add(spearShaft);
+
+            const spearHead = new THREE.Mesh(
+                new THREE.ConeGeometry(0.12, 0.55, 6),
+                spearSteelMat
+            );
+            spearHead.rotation.x = Math.PI / 2;
+            spearHead.position.set(0.4, 1.2, 3.10);
+            group.add(spearHead);
+'''
+          if old not in s:
+              raise SystemExit('spear block not found')
+          s = s.replace(old, new, 1)
+
+          # 2) Proper third-person sword.
+          old = '''            // Sword remains available for the existing weapon system.
+            const tpSword = new THREE.Group();
+
+            const tpBlade = new THREE.Mesh(
+                new THREE.BoxGeometry(0.045, 0.88, 0.018),
+                swordMat
+            );
+            tpBlade.position.y = 0.45;
+
+            const tpHilt = new THREE.Mesh(
+                new THREE.BoxGeometry(0.20, 0.045, 0.065),
+                ironMat
+            );
+            tpHilt.position.y = 0.02;
+
+            tpSword.add(tpBlade, tpHilt);
+            tpSword.position.set(0.38, 0.74, -0.02);
+            tpSword.rotation.z = 0.10;
+            tpSword.visible = false;
+            pModel.add(tpSword);
+'''
+          new = '''            // Improved military sword: tapered blade, fuller, guard, grip and pommel.
+            const tpSword = new THREE.Group();
+
+            const tpBlade = new THREE.Mesh(
+                new THREE.BoxGeometry(0.082, 0.72, 0.028),
+                swordMat
+            );
+            tpBlade.position.set(0, 0.46, 0);
+
+            const tpBladeTip = new THREE.Mesh(
+                new THREE.ConeGeometry(0.055, 0.28, 4),
+                swordMat
+            );
+            tpBladeTip.rotation.z = Math.PI / 4;
+            tpBladeTip.position.set(0, 0.96, 0);
+
+            const tpFuller = new THREE.Mesh(
+                new THREE.BoxGeometry(0.022, 0.56, 0.038),
+                ironMat
+            );
+            tpFuller.position.set(0, 0.48, -0.018);
+
+            const tpGuard = new THREE.Mesh(
+                new THREE.BoxGeometry(0.30, 0.055, 0.075),
+                ironMat
+            );
+            tpGuard.position.y = 0.055;
+
+            const tpGrip = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.038, 0.043, 0.24, 8),
+                leatherMat
+            );
+            tpGrip.position.y = -0.105;
+
+            const tpPommel = new THREE.Mesh(
+                new THREE.SphereGeometry(0.055, 8, 6),
+                ironMat
+            );
+            tpPommel.position.y = -0.255;
+
+            tpSword.add(tpBlade, tpBladeTip, tpFuller, tpGuard, tpGrip, tpPommel);
+            tpSword.position.set(0.38, 0.74, -0.02);
+            tpSword.rotation.set(0, 0, 0.10);
+            tpSword.visible = false;
+            pModel.add(tpSword);
+'''
+          if old not in s:
+              raise SystemExit('third-person sword block not found')
+          s = s.replace(old, new, 1)
+
+          # 3) Proper first-person sword.
+          old = '''        const swordGroup = new THREE.Group();
+        const swordBlade = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.9, 0.01), new THREE.MeshStandardMaterial({ color: 0xeeeeee, metalness: 0.95 }));
+        swordBlade.position.set(0, 0.45, 0);
+        swordGroup.add(swordBlade);
+        swordGroup.rotation.x = -Math.PI / 3; swordGroup.position.set(0, -0.1, -0.2);
+        swordGroup.visible = false;
+        weaponNode.add(swordGroup);
+'''
+          new = '''        const swordGroup = new THREE.Group();
+        const fpSwordMat = new THREE.MeshStandardMaterial({ color: 0xd8dadd, metalness: 0.95, roughness: 0.22 });
+        const fpGuardMat = new THREE.MeshStandardMaterial({ color: 0x4b5050, metalness: 0.82, roughness: 0.32 });
+        const fpGripMat = new THREE.MeshStandardMaterial({ color: 0x4a2e20, roughness: 0.9 });
+
+        const swordBlade = new THREE.Mesh(new THREE.BoxGeometry(0.055, 0.84, 0.025), fpSwordMat);
+        swordBlade.position.set(0, 0.50, 0);
+
+        const swordTip = new THREE.Mesh(new THREE.ConeGeometry(0.040, 0.24, 4), fpSwordMat);
+        swordTip.rotation.z = Math.PI / 4;
+        swordTip.position.set(0, 1.04, 0);
+
+        const swordFuller = new THREE.Mesh(new THREE.BoxGeometry(0.018, 0.60, 0.032), fpGuardMat);
+        swordFuller.position.set(0, 0.51, -0.015);
+
+        const swordGuard = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.05, 0.07), fpGuardMat);
+        swordGuard.position.y = 0.06;
+
+        const swordGrip = new THREE.Mesh(new THREE.CylinderGeometry(0.032, 0.037, 0.24, 8), fpGripMat);
+        swordGrip.position.y = -0.095;
+
+        const swordPommel = new THREE.Mesh(new THREE.SphereGeometry(0.045, 8, 6), fpGuardMat);
+        swordPommel.position.y = -0.245;
+
+        swordGroup.add(swordBlade, swordTip, swordFuller, swordGuard, swordGrip, swordPommel);
+        swordGroup.rotation.x = -Math.PI / 3;
+        swordGroup.position.set(0, -0.1, -0.2);
+        swordGroup.visible = false;
+        weaponNode.add(swordGroup);
+'''
+          if old not in s:
+              raise SystemExit('first-person sword block not found')
+          s = s.replace(old, new, 1)
+
+          # 4) Third-person musket: forward-facing when loaded, lowered during reload.
+          old = '''                data.musket.position.set(0.02, 0.92, -0.33);
+                data.musket.rotation.set(0, 0, -0.43);
+
+            } else {'''
+          new = '''                if (model === playerModel && STATE.reloading) {
+                    // Reload pose: bring the musket down across the chest.
+                    data.musket.position.set(0.03, 0.93, -0.20);
+                    data.musket.rotation.set(-0.78, 0, -0.30);
+                } else {
+                    // Loaded/carry-ready pose: muzzle points toward the soldier's forward -Z.
+                    data.musket.position.set(0.02, 0.98, -0.33);
+                    data.musket.rotation.set(-Math.PI / 2, 0, -0.08);
+                }
+
+            } else {'''
+          if old not in s:
+              raise SystemExit('third-person musket pose block not found')
+          s = s.replace(old, new, 1)
+
+          # 5) Fix Zulu facing: their visible shield/spear side is +Z, so lookAt
+          # the opposite point to make +Z face the target instead of walking backward.
+          old = '''                            z.group.lookAt(z.group.position.x + dir.x, z.group.position.y, z.group.position.z + dir.z);
+'''
+          new = '''                            z.group.lookAt(z.group.position.x - dir.x, z.group.position.y, z.group.position.z - dir.z);
+'''
+          if old not in s:
+              raise SystemExit('Zulu lookAt block not found')
+          s = s.replace(old, new, 1)
+
+          # 6) Explicit sword-swing state so melee attacks remain usable while walking.
+          old = '''            remoteWeapon: 'musket'
+        };'''
+          new = '''            remoteWeapon: 'musket'
+        };
+
+        let swordSwingUntil = 0;'''
+          if old not in s:
+              raise SystemExit('STATE footer block not found')
+          s = s.replace(old, new, 1)
+
+          old = '''                if (now - STATE.lastAttackTime < CONFIG.swordCooldown) return;
+                STATE.lastAttackTime = now;
+                swordGroup.rotation.z = -Math.PI / 1.5;
+'''
+          new = '''                if (now - STATE.lastAttackTime < CONFIG.swordCooldown) return;
+                STATE.lastAttackTime = now;
+                swordSwingUntil = now + Math.min(CONFIG.swordCooldown * 0.55, 420);
+                swordGroup.rotation.z = -Math.PI / 1.5;
+'''
+          if old not in s:
+              raise SystemExit('sword attack block not found')
+          s = s.replace(old, new, 1)
+
+          old = '''                if (STATE.weapon === 'sword') swordGroup.rotation.z += (0 - swordGroup.rotation.z) * 0.15;
+'''
+          new = '''                if (STATE.weapon === 'sword') {
+                    const swingTarget = performance.now() < swordSwingUntil ? -Math.PI / 1.5 : 0;
+                    swordGroup.rotation.z += (swingTarget - swordGroup.rotation.z) * 0.30;
+                }
+'''
+          if old not in s:
+              raise SystemExit('sword animation block not found')
+          s = s.replace(old, new, 1)
+
+          p.write_text(s, encoding='utf-8')
+          print('patched index.html', len(s), 'bytes')
+
+          # Basic sanity checks.
+          for needle in [
+              'spearSteelMat',
+              'tpBladeTip',
+              'first-person sword block not found',
+              'swordSwingUntil',
+              'z.group.lookAt(z.group.position.x - dir.x',
+              'Math.PI / 2'
+          ]:
+              if needle == 'first-person sword block not found':
+                  continue
+              assert needle in s, needle
+
+      - name: Commit index.html and remove workflow
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add index.html
+          git commit -m 'Fix Zulu facing and weapon animations'
+          git rm .github/workflows/patch-zulu-weapons.yml
+          git commit -m 'Remove temporary gameplay patch workflow'
+          git push
