@@ -1,0 +1,160 @@
+name: One-shot weapon model fix
+on:
+  push:
+    paths:
+      - '.github/workflows/one-shot-weapon-model-fix.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch standalone index.html
+        shell: python
+        run: |
+          from pathlib import Path
+          p = Path('index.html')
+          s = p.read_text(encoding='utf-8')
+
+          old = '''            const spearShaft = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 2.2), new THREE.MeshStandardMaterial({ color: 0x4a2e11 }));
+            spearShaft.rotation.x = Math.PI / 2; spearShaft.position.set(0.4, 1.2, 0.4); group.add(spearShaft);
+'''
+          new = '''            // Long spear matched to the Zulu attack range.
+            const spearWoodMat = new THREE.MeshStandardMaterial({ color: 0x4a2e11, roughness: 0.88 });
+            const spearSteelMat = new THREE.MeshStandardMaterial({ color: 0xbfc4c4, metalness: 0.9, roughness: 0.22 });
+
+            const spearShaft = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.023, 0.028, 3.0, 8),
+                spearWoodMat
+            );
+            spearShaft.rotation.x = Math.PI / 2;
+            spearShaft.position.set(0.4, 1.2, 0.55);
+            group.add(spearShaft);
+
+            // Sharp steel assegai-style spearhead.
+            const spearHead = new THREE.Mesh(
+                new THREE.ConeGeometry(0.11, 0.52, 6),
+                spearSteelMat
+            );
+            spearHead.rotation.x = Math.PI / 2;
+            spearHead.position.set(0.4, 1.2, 2.30);
+            group.add(spearHead);
+'''
+          if old not in s: raise SystemExit('spear block not found')
+          s = s.replace(old, new, 1)
+
+          old = '''            // Sword remains available for the existing weapon system.
+            const tpSword = new THREE.Group();
+
+            const tpBlade = new THREE.Mesh(
+                new THREE.BoxGeometry(0.045, 0.88, 0.018),
+                swordMat
+            );
+            tpBlade.position.y = 0.45;
+
+            const tpHilt = new THREE.Mesh(
+                new THREE.BoxGeometry(0.20, 0.045, 0.065),
+                ironMat
+            );
+            tpHilt.position.y = 0.02;
+
+            tpSword.add(tpBlade, tpHilt);
+            tpSword.position.set(0.38, 0.74, -0.02);
+            tpSword.rotation.z = 0.10;
+            tpSword.visible = false;
+            pModel.add(tpSword);
+'''
+          new = '''            // Proper military-style sword: tapered blade, fuller, guard, grip and pommel.
+            const tpSword = new THREE.Group();
+
+            const tpBlade = new THREE.Mesh(
+                new THREE.BoxGeometry(0.082, 0.72, 0.028),
+                swordMat
+            );
+            tpBlade.position.set(0, 0.46, 0);
+
+            const tpBladeTip = new THREE.Mesh(
+                new THREE.ConeGeometry(0.055, 0.28, 4),
+                swordMat
+            );
+            tpBladeTip.position.set(0, 0.96, 0);
+
+            const tpFuller = new THREE.Mesh(
+                new THREE.BoxGeometry(0.022, 0.55, 0.038),
+                ironMat
+            );
+            tpFuller.position.set(0, 0.48, -0.018);
+
+            const tpGuard = new THREE.Mesh(
+                new THREE.BoxGeometry(0.30, 0.055, 0.075),
+                ironMat
+            );
+            tpGuard.position.y = 0.055;
+
+            const tpGrip = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.038, 0.043, 0.24, 8),
+                leatherMat
+            );
+            tpGrip.position.y = -0.105;
+
+            const tpPommel = new THREE.Mesh(
+                new THREE.SphereGeometry(0.055, 8, 6),
+                ironMat
+            );
+            tpPommel.position.y = -0.255;
+
+            tpSword.add(tpBlade, tpBladeTip, tpFuller, tpGuard, tpGrip, tpPommel);
+            tpSword.position.set(0.38, 0.74, -0.02);
+            tpSword.rotation.set(0, 0, 0.10);
+            tpSword.visible = false;
+            pModel.add(tpSword);
+'''
+          if old not in s: raise SystemExit('sword block not found')
+          s = s.replace(old, new, 1)
+
+          old = '''                data.musket.position.set(0.02, 0.92, -0.33);
+                data.musket.rotation.set(0, 0, -0.43);
+
+            } else {'''
+          new = '''                // Forward-facing firing pose: local +Y points toward the soldier's -Z front.
+                if (STATE.weapon === 'musket' && STATE.reloading && model === playerModel) {
+                    // While reloading, lower and cant the musket across the chest.
+                    data.musket.position.set(0.02, 0.94, -0.18);
+                    data.musket.rotation.set(-1.02, 0, -0.34);
+                } else {
+                    // Loaded/carry-ready pose: muzzle points directly toward the enemy/front.
+                    data.musket.position.set(0.02, 0.99, -0.34);
+                    data.musket.rotation.set(-1.30, 0, -0.10);
+                }
+
+            } else {'''
+          if old not in s: raise SystemExit('musket pose block not found')
+          s = s.replace(old, new, 1)
+
+          old = '''            if (weapon === 'musket') {
+                data.musket.visible = true;
+                data.sword.visible = false;
+'''
+          new = '''            if (weapon === 'musket') {
+                data.musket.visible = true;
+                data.sword.visible = false;
+'''
+          # Deliberately no-op; keeps exact matching simple.
+
+          p.write_text(s, encoding='utf-8')
+          assert 'spearSteelMat' in s
+          assert 'tpBladeTip' in s
+          assert 'Loaded/carry-ready pose' in s
+          print('Patched index.html:', len(s), 'bytes')
+
+      - name: Commit patch and remove workflow
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add index.html
+          git commit -m 'Improve Zulu spears and third-person weapons'
+          git rm .github/workflows/one-shot-weapon-model-fix.yml
+          git commit -m 'Remove temporary weapon model patch workflow'
+          git push
