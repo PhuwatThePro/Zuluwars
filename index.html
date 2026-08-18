@@ -124,6 +124,7 @@
             background: rgba(139, 90, 43, 0.8);
             border: 2px solid #f0e6d2;
             border-radius: 25px;
+            pointer-events: none;
         }
         #action-buttons {
             position: absolute;
@@ -289,7 +290,7 @@
                 <div>WEAPON: <span id="weapon-val">MARTINI-HENRY</span></div>
                 <div id="ammo-val">READY</div>
                 <div id="reload-bar-container"><div id="reload-bar"></div></div>
-                <div class="hint-text">[L-Click/Btn]: Fire | [Q/E]: Swap</div>
+                <div class="hint-text">[WASD]: Move | [Click]: Lock Aim</div>
             </div>
         </div>
     </div>
@@ -384,13 +385,19 @@
         scene.background = new THREE.Color(0x95a5b5);
         scene.fog = new THREE.FogExp2(0x95a5b5, 0.010);
 
-        const camera = new THREE.PerspectiveCamera(60, container.clientWidth / container.clientHeight, 0.1, 1000);
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
         const renderer = new THREE.WebGLRenderer({ antialias: true });
-        renderer.setSize(container.clientWidth, container.clientHeight);
+        renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         renderer.shadowMap.enabled = true;
         renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         container.appendChild(renderer.domElement);
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
 
         const ambientLight = new THREE.AmbientLight(0xffeedd, 1.2);
         scene.add(ambientLight);
@@ -409,7 +416,7 @@
         ground.receiveShadow = true;
         scene.add(ground);
 
-        // Mountains & Colliders (Original Map Layout Restored)
+        // Mountains & Colliders
         const mountainMat = new THREE.MeshStandardMaterial({ color: 0x3d3123, roughness: 0.9 });
         const mountainColliders = [];
 
@@ -461,7 +468,7 @@
             return false;
         }
 
-        // Mealbag Barricade Restored
+        // Mealbag Barricade
         const bagMat = new THREE.MeshStandardMaterial({ color: 0xb5a075, roughness: 0.9 });
         for (let i = -6; i <= 6; i++) {
             const angle = (i / 12) * Math.PI * 0.7;
@@ -473,7 +480,7 @@
             scene.add(bag);
         }
 
-        // Environment Trees Restored
+        // Environment Trees
         const woodMat = new THREE.MeshStandardMaterial({ color: 0x4a2e11, roughness: 0.8 });
         const leafMat = new THREE.MeshStandardMaterial({ color: 0x475e2e, roughness: 0.9 });
         for (let i = 0; i < 24; i++) {
@@ -544,7 +551,6 @@
             tpMusket.position.set(0, -0.55, 0); tpMusket.rotation.x = -Math.PI / 2;
             rightArmGroup.add(tpMusket);
 
-            // Left arm angled across chest to grip musket barrel
             rightArmGroup.rotation.set(1.2, -0.2, -0.1);
             leftArmGroup.rotation.set(1.25, -0.55, 0.35);
 
@@ -588,7 +594,7 @@
         remotePlayerMesh.visible = false;
         scene.add(remotePlayerMesh);
 
-        // Smoke Particle Effects Restored
+        // Smoke Particle Effects
         const smokeParticles = [];
         const smokeGeo = new THREE.SphereGeometry(0.25, 4, 4);
         const smokeMat = new THREE.MeshBasicMaterial({ color: 0xdddddd, transparent: true, opacity: 0.7 });
@@ -610,6 +616,114 @@
                 p.vz = dir.z * 0.1 + (Math.random() - 0.5) * 0.05;
             });
         }
+
+        // INPUT AND CAMERA CONTROL HANDLERS
+        let yaw = 0, pitch = 0;
+        const input = { forward: 0, right: 0 };
+        const keys = {};
+
+        // 1. Mouse Aiming & Pointer Lock (PC)
+        renderer.domElement.addEventListener('click', () => {
+            if (STATE.gameStarted && !STATE.settingsOpen && !STATE.gameOver) {
+                renderer.domElement.requestPointerLock();
+            }
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (document.pointerLockElement === renderer.domElement || document.pointerLockElement === document.body) {
+                yaw -= e.movementX * 0.0025;
+                pitch -= e.movementY * 0.0025;
+                pitch = Math.max(-Math.PI / 2.3, Math.min(Math.PI / 2.3, pitch));
+            }
+        });
+
+        // 2. Touch Controls (Mobile)
+        const touchLookZone = document.getElementById('touch-look');
+        let lookTouchId = null;
+        let lastTouchX = 0, lastTouchY = 0;
+
+        touchLookZone.addEventListener('touchstart', (e) => {
+            for (let t of e.changedTouches) {
+                if (lookTouchId === null) {
+                    lookTouchId = t.identifier;
+                    lastTouchX = t.clientX;
+                    lastTouchY = t.clientY;
+                }
+            }
+        }, { passive: false });
+
+        window.addEventListener('touchmove', (e) => {
+            for (let t of e.changedTouches) {
+                if (t.identifier === lookTouchId) {
+                    const dx = t.clientX - lastTouchX;
+                    const dy = t.clientY - lastTouchY;
+                    yaw -= dx * 0.005;
+                    pitch -= dy * 0.005;
+                    pitch = Math.max(-Math.PI / 2.3, Math.min(Math.PI / 2.3, pitch));
+                    lastTouchX = t.clientX;
+                    lastTouchY = t.clientY;
+                }
+            }
+        }, { passive: false });
+
+        window.addEventListener('touchend', (e) => {
+            for (let t of e.changedTouches) {
+                if (t.identifier === lookTouchId) lookTouchId = null;
+            }
+        });
+
+        // Touch Joystick
+        const joystickBound = document.getElementById('joystick-bound');
+        const joystickThumb = document.getElementById('joystick-thumb');
+        let joyTouchId = null;
+
+        function updateJoystick(t) {
+            const rect = joystickBound.getBoundingClientRect();
+            let dx = t.clientX - (rect.left + 60);
+            let dy = t.clientY - (rect.top + 60);
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            const maxR = 40;
+            if (dist > maxR) {
+                dx = (dx / dist) * maxR;
+                dy = (dy / dist) * maxR;
+            }
+            joystickThumb.style.transform = `translate(${dx}px, ${dy}px)`;
+            input.right = dx / maxR;
+            input.forward = -dy / maxR;
+        }
+
+        joystickBound.addEventListener('touchstart', (e) => {
+            for (let t of e.changedTouches) {
+                if (joyTouchId === null) {
+                    joyTouchId = t.identifier;
+                    updateJoystick(t);
+                }
+            }
+        }, { passive: false });
+
+        window.addEventListener('touchmove', (e) => {
+            for (let t of e.changedTouches) {
+                if (t.identifier === joyTouchId) updateJoystick(t);
+            }
+        }, { passive: false });
+
+        window.addEventListener('touchend', (e) => {
+            for (let t of e.changedTouches) {
+                if (t.identifier === joyTouchId) {
+                    joyTouchId = null;
+                    input.forward = 0;
+                    input.right = 0;
+                    joystickThumb.style.transform = `translate(0px, 0px)`;
+                }
+            }
+        });
+
+        // 3. Keyboard Inputs (PC)
+        window.addEventListener('keydown', e => {
+            keys[e.code] = true;
+            if (e.code === 'KeyQ' || e.code === 'KeyE') switchWeapon();
+        });
+        window.addEventListener('keyup', e => keys[e.code] = false);
 
         // PeerJS Setup
         function initPeer(customId = null) {
@@ -748,16 +862,6 @@
             setTimeout(() => { STATE.waveActive = true; }, 2500);
         }
 
-        let yaw = 0, pitch = 0, lastSpawn = 0;
-        const input = { forward: 0, right: 0 };
-        const keys = {};
-
-        window.addEventListener('keydown', e => {
-            keys[e.code] = true;
-            if (e.code === 'KeyQ' || e.code === 'KeyE') switchWeapon();
-        });
-        window.addEventListener('keyup', e => keys[e.code] = false);
-
         function switchWeapon() {
             if (STATE.reloading) return;
             STATE.weapon = STATE.weapon === 'musket' ? 'sword' : 'musket';
@@ -840,12 +944,14 @@
         document.getElementById('btn-attack').addEventListener('click', performAttack);
         document.getElementById('btn-switch').addEventListener('click', switchWeapon);
         window.addEventListener('mousedown', (e) => { 
-            if (e.button === 0 && STATE.gameStarted && !e.target.closest('.modal-screen') && !e.target.closest('.btn') && !e.target.closest('.icon-btn')) {
+            if (e.button === 0 && STATE.gameStarted && document.pointerLockElement === renderer.domElement) {
                 performAttack();
             } 
         });
 
+        let lastSpawn = 0;
         const clock = new THREE.Clock();
+
         function animate() {
             requestAnimationFrame(animate);
             const delta = clock.getDelta();
@@ -855,13 +961,15 @@
                 player.rotation.y = yaw;
                 cameraNode.rotation.x = pitch;
 
-                let moveZ = input.forward + (keys['KeyW'] ? 1 : 0) - (keys['KeyS'] ? 1 : 0);
-                let moveX = input.right + (keys['KeyD'] ? 1 : 0) - (keys['KeyA'] ? 1 : 0);
+                let moveZ = input.forward + (keys['KeyW'] || keys['ArrowUp'] ? 1 : 0) - (keys['KeyS'] || keys['ArrowDown'] ? 1 : 0);
+                let moveX = input.right + (keys['KeyD'] || keys['ArrowRight'] ? 1 : 0) - (keys['KeyA'] || keys['ArrowLeft'] ? 1 : 0);
                 
                 const moveDir = new THREE.Vector3(moveX, 0, -moveZ).normalize();
-                moveDir.applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
-                const nextPos = player.position.clone().addScaledVector(moveDir, 0.1);
-                if (!checkMountainCollision(nextPos)) player.position.copy(nextPos);
+                if (moveDir.length() > 0) {
+                    moveDir.applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
+                    const nextPos = player.position.clone().addScaledVector(moveDir, 0.1);
+                    if (!checkMountainCollision(nextPos)) player.position.copy(nextPos);
+                }
 
                 if (STATE.reloading) {
                     const elapsed = performance.now() - STATE.lastAttackTime;
@@ -908,6 +1016,7 @@
 
         function triggerGameOver() {
             STATE.gameOver = true;
+            if (document.exitPointerLock) document.exitPointerLock();
             document.getElementById('final-wave').innerText = STATE.wave;
             document.getElementById('final-score').innerText = STATE.score;
             document.getElementById('game-over').style.display = 'flex';
