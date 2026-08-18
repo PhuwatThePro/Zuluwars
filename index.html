@@ -13,7 +13,6 @@
             font-family: 'Courier New', Courier, monospace; 
             touch-action: none; 
             background-color: #1a1a1a;
-            /* Revamped Menu Background: British Regiment in Zulu Wars */
             background-image: linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.8)), url('https://images.squarespace-cdn.com/content/v1/55ba62bbe4b0e98081681283/1495475851493-27O5C5C26685D275C266/image-asset.jpeg');
             background-size: cover;
             background-position: center;
@@ -122,7 +121,6 @@
                 <input type="text" id="room-code-input" class="input-field" placeholder="4-DIGIT CODE" maxlength="4" style="margin-bottom:0; width:60%;">
                 <button class="toggle-btn" style="width:40%; background:#8b5a2b; color:#fff;" onclick="joinRoom()">JOIN</button>
             </div>
-            <!-- Singleplayer button removed as requested -->
         </div>
     </div>
 
@@ -179,7 +177,6 @@
             baseSpeed: 0.08,
             baseSpawnInterval: 2200,
             zuluDamage: 18,
-            musketDamage: 2,
             swordDamage: 1
         };
 
@@ -227,7 +224,7 @@
         ground.receiveShadow = true;
         scene.add(ground);
 
-        // Deterministic Pseudo-Random Seed Generator for identical landscape between Host & Joiners
+        // Deterministic Seed Generator
         let seedValue = 1879;
         function seededRandom() {
             let x = Math.sin(seedValue++) * 10000;
@@ -276,7 +273,6 @@
         }
         buildMountains();
 
-        // Environment Trees (Seeded Sync so Host and Client see exact same trees)
         function buildTrees() {
             const trunkMat = new THREE.MeshStandardMaterial({ color: 0x4a2e11, roughness: 0.9 });
             const foliageMat = new THREE.MeshStandardMaterial({ color: 0x2d4c1e, roughness: 0.8 });
@@ -330,7 +326,7 @@
             scene.add(bag);
         }
 
-        // 3D Nametag (Version tag removed from bubble as requested)
+        // 3D Nametag Sprite
         function createNametagSprite(nameText) {
             const canvas = document.createElement('canvas');
             canvas.width = 256; canvas.height = 64;
@@ -345,7 +341,6 @@
             ctx.fillStyle = '#f0e6d2';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            // Explicitly removed GAME_VERSION from here
             ctx.fillText(nameText, 128, 32);
 
             const texture = new THREE.CanvasTexture(canvas);
@@ -645,7 +640,6 @@
                 document.getElementById('network-status').innerText = `ONLINE (${GAME_VERSION})`;
                 remotePlayerMesh.visible = true;
                 setInterval(sendNetworkPacket, 50);
-                // Handshake still sends version for compatibility checks, but createNametagSprite won't use it
                 conn.send({ type: 'HANDSHAKE', name: playerName, version: GAME_VERSION });
             });
 
@@ -653,7 +647,6 @@
                 if (data.type === 'HANDSHAKE') {
                     remotePlayerName = data.name;
                     if (nametagSprite) remotePlayerMesh.remove(nametagSprite);
-                    // createNametagSprite only takes name now
                     nametagSprite = createNametagSprite(remotePlayerName);
                     remotePlayerMesh.add(nametagSprite);
                 } else if (data.type === 'SYNC') {
@@ -694,15 +687,11 @@
             }
         }
 
-        // Removed startSingleplayer function as button was removed
-
         function startGame() {
-            // Hide menu background elements
             document.getElementById('lobby-modal').style.display = 'none';
             document.body.style.backgroundImage = 'none';
-            document.body.style.backgroundColor = '#000'; // Black fallback for Three.js
+            document.body.style.backgroundColor = '#000';
             
-            // Show game elements
             document.getElementById('canvas-container').style.display = 'block';
             document.getElementById('ui-layer').style.display = 'flex';
             document.getElementById('controls-layer').style.display = 'block';
@@ -712,7 +701,7 @@
             if (isHost || !conn) startWave(1);
         }
 
-        // Enemy Management
+        // Enemy Management & Precise Hitboxes
         const zulus = [];
         const zuluMat = new THREE.MeshStandardMaterial({ color: 0x6e3b23, roughness: 0.85 });
 
@@ -729,17 +718,27 @@
             const spearShaft = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 2.2), new THREE.MeshStandardMaterial({ color: 0x4a2e11 }));
             spearShaft.rotation.x = Math.PI / 2; spearShaft.position.set(0.4, 1.2, 0.4); group.add(spearShaft);
 
-            const hitMesh = new THREE.Mesh(new THREE.SphereGeometry(1.2), new THREE.MeshBasicMaterial({ visible: false }));
-            hitMesh.position.y = 1.2; group.add(hitMesh);
-
             const zId = id !== null ? id : zuluIdCounter++;
+
+            // Precise Head Hitbox (1-shot kill zone)
+            const headHitbox = new THREE.Mesh(new THREE.SphereGeometry(0.32, 8, 8), new THREE.MeshBasicMaterial({ visible: false }));
+            headHitbox.position.y = 2.1;
+            headHitbox.userData = { zuluId: zId, part: 'head' };
+            group.add(headHitbox);
+
+            // Precise Body Hitbox (2-shot kill zone)
+            const bodyHitbox = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.38, 1.4, 8), new THREE.MeshBasicMaterial({ visible: false }));
+            bodyHitbox.position.y = 1.2;
+            bodyHitbox.userData = { zuluId: zId, part: 'body' };
+            group.add(bodyHitbox);
+
             const posX = x !== null ? x : (Math.random() - 0.5) * 36;
             const posZ = z !== null ? z : (-45 - Math.random() * 10);
 
             group.position.set(posX, 0, posZ);
             scene.add(group);
 
-            const zObj = { id: zId, group: group, hitTarget: hitMesh, hp: 2, animOffset: Math.random() * 10 };
+            const zObj = { id: zId, group: group, headHitbox: headHitbox, bodyHitbox: bodyHitbox, hp: 2, animOffset: Math.random() * 10 };
             zulus.push(zObj);
             return zObj;
         }
@@ -855,7 +854,6 @@
                 weaponNode.position.z += 0.25;
                 weaponNode.rotation.x += 0.25;
 
-                // Fire Smoke Particle Emitter
                 const originCamPos = camera.getWorldPosition(new THREE.Vector3());
                 spawnGunSmoke(originCamPos, dir);
 
@@ -863,19 +861,33 @@
                     conn.send({ type: 'SMOKE_FX', x: originCamPos.x, y: originCamPos.y, z: originCamPos.z, dx: dir.x, dy: dir.y, dz: dir.z });
                 }
 
+                // Gather head & body hitboxes
+                const hitboxes = [];
+                zulus.forEach(z => {
+                    if (z.headHitbox) hitboxes.push(z.headHitbox);
+                    if (z.bodyHitbox) hitboxes.push(z.bodyHitbox);
+                });
+
                 const raycaster = new THREE.Raycaster(camera.getWorldPosition(new THREE.Vector3()), dir);
-                const hits = raycaster.intersectObjects(zulus.map(z => z.hitTarget));
+                const hits = raycaster.intersectObjects(hitboxes);
                 
                 if (hits.length > 0) {
-                    const hitZulu = zulus.find(z => z.hitTarget === hits[0].object);
+                    const hitObj = hits[0].object;
+                    const zuluId = hitObj.userData.zuluId;
+                    const part = hitObj.userData.part;
+                    const hitZulu = zulus.find(z => z.id === zuluId);
+                    
                     if (hitZulu) {
+                        // Headshot = 2 damage (One Shot Kill), Bodyshot = 1 damage (Two Shot Kill)
+                        const damage = (part === 'head') ? 2 : 1;
+
                         showHitFeedback();
                         spawnHitRing(hits[0].point);
 
                         if (isHost || !conn) {
-                            damageZulu(hitZulu.id, CONFIG.musketDamage, hits[0].point);
+                            damageZulu(hitZulu.id, damage, hits[0].point);
                         } else {
-                            conn.send({ type: 'HIT_ZULU', zuluId: hitZulu.id, damage: CONFIG.musketDamage, hitPos: hits[0].point });
+                            conn.send({ type: 'HIT_ZULU', zuluId: hitZulu.id, damage: damage, hitPos: hits[0].point });
                         }
                     }
                 }
@@ -918,7 +930,7 @@
 
         function animate() {
             requestAnimationFrame(animate);
-            if (!STATE.gameStarted) return; // Don't run Three.js loops if not started
+            if (!STATE.gameStarted) return;
 
             const delta = clock.getDelta();
             const time = clock.getElapsedTime();
