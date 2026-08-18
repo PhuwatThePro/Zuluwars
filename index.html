@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>1879 Frontier Defense - Mountain Pass v1.2.0</title>
+    <title>1879 Frontier Defense - Mountain Pass v1.2.1</title>
     <style>
         * { box-sizing: border-box; user-select: none; -webkit-user-select: none; margin: 0; padding: 0; }
         body, html { width: 100%; height: 100%; overflow: hidden; background-color: #000; font-family: 'Courier New', Courier, monospace; touch-action: none; }
@@ -12,7 +12,7 @@
         .hud-panel { background: rgba(20, 15, 10, 0.85); border: 2px solid #8b5a2b; color: #f0e6d2; padding: 10px 15px; border-radius: 4px; font-weight: bold; text-shadow: 1px 1px 2px #000; pointer-events: auto; }
         #top-hud { display: flex; justify-content: space-between; align-items: flex-start; }
         #hud-center { display: flex; flex-direction: column; align-items: center; gap: 6px; }
-        .version-badge { background: #d4af37; color: #150f0b; padding: 2px 8px; border-radius: 3px; font-size: 11px; font-weight: bold; }
+        .version-badge { background: #d4af37; color: #150f0b; padding: 3px 10px; border-radius: 3px; font-size: 12px; font-weight: bold; border: 1px solid #fff; box-shadow: 0 0 5px rgba(212, 175, 55, 0.5); }
         .icon-btn { background: rgba(20, 15, 10, 0.85); border: 2px solid #d4af37; color: #f0e6d2; padding: 8px 12px; border-radius: 4px; font-weight: bold; cursor: pointer; pointer-events: auto; font-family: inherit; }
         .icon-btn:hover { background: #8b5a2b; }
         #room-code-badge { background: rgba(0, 0, 0, 0.85); border: 1px solid #d4af37; color: #d4af37; padding: 4px 8px; border-radius: 4px; font-size: 11px; display: none; }
@@ -32,7 +32,6 @@
         #reload-bar-container { width: 150px; height: 10px; background: rgba(0,0,0,0.5); border: 1px solid #8b5a2b; margin-top: 5px; display: none; }
         #reload-bar { width: 0%; height: 100%; background: #d4af37; }
         
-        /* Red Circle Hit Indicator HUD */
         #hit-indicator { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 44px; height: 44px; border: 3px solid #ff2222; border-radius: 50%; pointer-events: none; opacity: 0; transition: opacity 0.05s ease-out; z-index: 6; }
         
         #wave-banner { position: absolute; top: 30%; left: 50%; transform: translate(-50%, -50%); text-align: center; color: #d4af37; z-index: 15; pointer-events: none; opacity: 0; transition: opacity 0.5s ease; text-shadow: 3px 3px 6px #000; }
@@ -76,7 +75,7 @@
                 <div style="font-size: 10px; color: #88ff88; margin-top: 4px;" id="network-status">OFFLINE</div>
             </div>
             <div id="hud-center">
-                <span class="version-badge">v1.2.0</span>
+                <span class="version-badge">v1.2.1</span>
                 <button class="icon-btn" onclick="toggleSettings()">⚙ SETTINGS</button>
                 <div id="room-code-badge">ROOM CODE: <span id="room-code-val">----</span></div>
             </div>
@@ -102,7 +101,7 @@
     <div id="lobby-modal" class="modal-screen">
         <div class="modal-box">
             <h2>FRONTIER DEFENSE</h2>
-            <div style="font-size: 12px; color: #d4af37; margin-bottom: 15px;">VERSION 1.2.0</div>
+            <div style="font-size: 13px; color: #d4af37; margin-bottom: 15px; font-weight: bold;">VERSION 1.2.1</div>
             <input type="text" id="player-name" class="input-field" placeholder="SOLDIER NAME" maxlength="12" value="Private">
             
             <button class="close-btn" style="background: #2b4a8b; margin-top: 0; margin-bottom: 12px;" onclick="createRoom()">CREATE ROOM (HOST)</button>
@@ -119,7 +118,7 @@
     <!-- SETTINGS MODAL -->
     <div id="settings-modal" class="modal-screen" style="display: none;">
         <div class="modal-box">
-            <h2>SETTINGS</h2>
+            <h2>SETTINGS <span style="font-size: 12px; color: #d4af37;">(v1.2.1)</span></h2>
             <div class="setting-row">
                 <span>CAMERA VIEW</span>
                 <div class="toggle-group">
@@ -142,6 +141,8 @@
     </div>
 
     <script>
+        const GAME_VERSION = "v1.2.1";
+
         const STATE = {
             hp: 100,
             score: 0,
@@ -215,6 +216,13 @@
         ground.receiveShadow = true;
         scene.add(ground);
 
+        // Deterministic Pseudo-Random Seed Generator for identical landscape between Host & Joiners
+        let seedValue = 1879;
+        function seededRandom() {
+            let x = Math.sin(seedValue++) * 10000;
+            return x - Math.floor(x);
+        }
+
         // Mountains & Colliders
         const mountainMat = new THREE.MeshStandardMaterial({ color: 0x3d3123, roughness: 0.9 });
         const mountainColliders = [];
@@ -222,33 +230,33 @@
         function buildMountains() {
             const mountainGroup = new THREE.Group();
             for (let i = -10; i <= 10; i++) {
-                const h = 35 + Math.random() * 20, r = 12 + Math.random() * 6;
+                const h = 35 + seededRandom() * 20, r = 12 + seededRandom() * 6;
                 const m = new THREE.Mesh(new THREE.ConeGeometry(r, h, 7), mountainMat);
-                const px = i * 6, pz = 18 + Math.random() * 6;
+                const px = i * 6, pz = 18 + seededRandom() * 6;
                 m.position.set(px, h / 2, pz);
                 mountainGroup.add(m);
                 mountainColliders.push({ x: px, z: pz, radius: r * 0.75 });
             }
             for (let z = -55; z <= 20; z += 7) {
-                const h = 30 + Math.random() * 15, r = 10 + Math.random() * 5;
+                const h = 30 + seededRandom() * 15, r = 10 + seededRandom() * 5;
                 const m = new THREE.Mesh(new THREE.ConeGeometry(r, h, 6), mountainMat);
-                const px = -24 - Math.random() * 6;
+                const px = -24 - seededRandom() * 6;
                 m.position.set(px, h / 2, z);
                 mountainGroup.add(m);
                 mountainColliders.push({ x: px, z: z, radius: r * 0.75 });
             }
             for (let z = -55; z <= 20; z += 7) {
-                const h = 30 + Math.random() * 15, r = 10 + Math.random() * 5;
+                const h = 30 + seededRandom() * 15, r = 10 + seededRandom() * 5;
                 const m = new THREE.Mesh(new THREE.ConeGeometry(r, h, 6), mountainMat);
-                const px = 24 + Math.random() * 6;
+                const px = 24 + seededRandom() * 6;
                 m.position.set(px, h / 2, z);
                 mountainGroup.add(m);
                 mountainColliders.push({ x: px, z: z, radius: r * 0.75 });
             }
             for (let i = -8; i <= 8; i++) {
-                const h = 35 + Math.random() * 20, r = 12 + Math.random() * 6;
+                const h = 35 + seededRandom() * 20, r = 12 + seededRandom() * 6;
                 const m = new THREE.Mesh(new THREE.ConeGeometry(r, h, 7), mountainMat);
-                const px = i * 7, pz = -62 - Math.random() * 5;
+                const px = i * 7, pz = -62 - seededRandom() * 5;
                 m.position.set(px, h / 2, pz);
                 mountainGroup.add(m);
                 mountainColliders.push({ x: px, z: pz, radius: r * 0.75 });
@@ -257,12 +265,12 @@
         }
         buildMountains();
 
-        // Environment Trees
+        // Environment Trees (Seeded Sync so Host and Client see exact same trees)
         function buildTrees() {
             const trunkMat = new THREE.MeshStandardMaterial({ color: 0x4a2e11, roughness: 0.9 });
             const foliageMat = new THREE.MeshStandardMaterial({ color: 0x2d4c1e, roughness: 0.8 });
             
-            for (let i = 0; i < 35; i++) {
+            for (let i = 0; i < 40; i++) {
                 const treeGroup = new THREE.Group();
                 const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.35, 2.6, 6), trunkMat);
                 trunk.position.y = 1.3;
@@ -279,13 +287,13 @@
                 f2.castShadow = true;
                 treeGroup.add(f2);
 
-                const tx = (Math.random() - 0.5) * 40;
-                const tz = -48 + Math.random() * 56;
+                const tx = (seededRandom() - 0.5) * 40;
+                const tz = -48 + seededRandom() * 56;
 
                 if (Math.abs(tx) > 4.5 || tz > 6) {
                     treeGroup.position.set(tx, 0, tz);
                     scene.add(treeGroup);
-                    mountainColliders.push({ x: tx, z: tz, radius: 0.7 });
+                    mountainColliders.push({ x: tx, z: tz, radius: 0.75 });
                 }
             }
         }
@@ -311,27 +319,28 @@
             scene.add(bag);
         }
 
-        // 3D Nametag
-        function createNametagSprite(nameText) {
+        // 3D Nametag with explicit Version Tag
+        function createNametagSprite(nameText, versionText = GAME_VERSION) {
             const canvas = document.createElement('canvas');
-            canvas.width = 256; canvas.height = 64;
+            canvas.width = 320; canvas.height = 70;
             const ctx = canvas.getContext('2d');
-            ctx.fillStyle = 'rgba(20, 15, 10, 0.75)';
+            ctx.fillStyle = 'rgba(20, 15, 10, 0.85)';
             ctx.strokeStyle = '#d4af37';
             ctx.lineWidth = 4;
-            ctx.fillRect(4, 4, 248, 56);
-            ctx.strokeRect(4, 4, 248, 56);
-            ctx.font = 'Bold 26px Courier New';
+            ctx.fillRect(4, 4, 312, 62);
+            ctx.strokeRect(4, 4, 312, 62);
+            
+            ctx.font = 'Bold 22px Courier New';
             ctx.fillStyle = '#f0e6d2';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.fillText(nameText, 128, 32);
+            ctx.fillText(`${nameText} [${versionText}]`, 160, 35);
 
             const texture = new THREE.CanvasTexture(canvas);
             const spriteMat = new THREE.SpriteMaterial({ map: texture });
             const sprite = new THREE.Sprite(spriteMat);
-            sprite.scale.set(2.5, 0.625, 1);
-            sprite.position.y = 2.2;
+            sprite.scale.set(3.2, 0.7, 1);
+            sprite.position.y = 2.4;
             return sprite;
         }
 
@@ -418,31 +427,31 @@
 
         // Visual Effects: Gun Smoke Particle System
         const smokeParticles = [];
-        const smokeGeo = new THREE.SphereGeometry(0.25, 8, 8);
+        const smokeGeo = new THREE.SphereGeometry(0.28, 8, 8);
 
         function spawnGunSmoke(originPos, dirVector) {
-            for (let i = 0; i < 18; i++) {
-                const mat = new THREE.MeshBasicMaterial({ color: 0xdddddd, transparent: true, opacity: 0.8, depthWrite: false });
+            for (let i = 0; i < 20; i++) {
+                const mat = new THREE.MeshBasicMaterial({ color: 0xeeeeee, transparent: true, opacity: 0.85, depthWrite: false });
                 const mesh = new THREE.Mesh(smokeGeo, mat);
                 
-                // Spawn forward along dirVector from muzzle
-                const spawnPt = originPos.clone().add(dirVector.clone().multiplyScalar(0.9));
-                spawnPt.x += (Math.random() - 0.5) * 0.3;
-                spawnPt.y += (Math.random() - 0.5) * 0.3;
-                spawnPt.z += (Math.random() - 0.5) * 0.3;
+                // Direct forward projection along sightline vector
+                const spawnPt = originPos.clone().add(dirVector.clone().multiplyScalar(0.95));
+                spawnPt.x += (Math.random() - 0.5) * 0.35;
+                spawnPt.y += (Math.random() - 0.5) * 0.35;
+                spawnPt.z += (Math.random() - 0.5) * 0.35;
                 mesh.position.copy(spawnPt);
 
-                const speed = 1.2 + Math.random() * 2.5;
+                const speed = 1.4 + Math.random() * 2.8;
                 const vel = dirVector.clone().multiplyScalar(speed);
-                vel.x += (Math.random() - 0.5) * 1.2;
-                vel.y += 0.8 + Math.random() * 1.4; // upward float
-                vel.z += (Math.random() - 0.5) * 1.2;
+                vel.x += (Math.random() - 0.5) * 1.4;
+                vel.y += 0.9 + Math.random() * 1.6;
+                vel.z += (Math.random() - 0.5) * 1.4;
 
-                const scale = 0.6 + Math.random() * 0.7;
+                const scale = 0.65 + Math.random() * 0.75;
                 mesh.scale.set(scale, scale, scale);
 
                 scene.add(mesh);
-                smokeParticles.push({ mesh: mesh, vel: vel, opacity: 0.8 });
+                smokeParticles.push({ mesh: mesh, vel: vel, opacity: 0.85 });
             }
         }
 
@@ -450,8 +459,8 @@
             for (let i = smokeParticles.length - 1; i >= 0; i--) {
                 const sp = smokeParticles[i];
                 sp.mesh.position.addScaledVector(sp.vel, delta);
-                sp.mesh.scale.addScalar(delta * 2.2);
-                sp.opacity -= delta * 1.1;
+                sp.mesh.scale.addScalar(delta * 2.4);
+                sp.opacity -= delta * 1.0;
                 sp.mesh.material.opacity = Math.max(0, sp.opacity);
 
                 if (sp.opacity <= 0) {
@@ -462,7 +471,7 @@
             }
         }
 
-        // 3D Red Hit Rings Visual
+        // 3D Hit Rings
         const hitRings = [];
         const ringGeo = new THREE.RingGeometry(0.2, 0.65, 16);
 
@@ -622,17 +631,17 @@
 
         function setupNetwork() {
             conn.on('open', () => {
-                document.getElementById('network-status').innerText = "ONLINE (P2P)";
+                document.getElementById('network-status').innerText = `ONLINE (${GAME_VERSION})`;
                 remotePlayerMesh.visible = true;
                 setInterval(sendNetworkPacket, 50);
-                conn.send({ type: 'HANDSHAKE', name: playerName });
+                conn.send({ type: 'HANDSHAKE', name: playerName, version: GAME_VERSION });
             });
 
             conn.on('data', (data) => {
                 if (data.type === 'HANDSHAKE') {
                     remotePlayerName = data.name;
                     if (nametagSprite) remotePlayerMesh.remove(nametagSprite);
-                    nametagSprite = createNametagSprite(remotePlayerName);
+                    nametagSprite = createNametagSprite(remotePlayerName, data.version || GAME_VERSION);
                     remotePlayerMesh.add(nametagSprite);
                 } else if (data.type === 'SYNC') {
                     remotePlayerMesh.position.set(data.x, data.y, data.z);
@@ -673,7 +682,7 @@
         }
 
         function startSingleplayer() {
-            document.getElementById('network-status').innerText = "OFFLINE";
+            document.getElementById('network-status').innerText = `OFFLINE (${GAME_VERSION})`;
             startGame();
         }
 
@@ -683,7 +692,7 @@
             if (isHost || !conn) startWave(1);
         }
 
-        // Shared Enemy Management
+        // Enemy Management
         const zulus = [];
         const zuluMat = new THREE.MeshStandardMaterial({ color: 0x6e3b23, roughness: 0.85 });
 
@@ -826,7 +835,7 @@
                 weaponNode.position.z += 0.25;
                 weaponNode.rotation.x += 0.25;
 
-                // Fire Gun Smoke directly from forward view vector
+                // Fire Smoke Particle Emitter
                 const originCamPos = camera.getWorldPosition(new THREE.Vector3());
                 spawnGunSmoke(originCamPos, dir);
 
@@ -910,7 +919,7 @@
                         if (!checkMountainCollision(nextPos)) player.position.copy(nextPos);
                     }
 
-                    // Direct Client & Host Damage Detection
+                    // Direct Damage Detection
                     zulus.forEach(z => {
                         const dx = player.position.x - z.group.position.x;
                         const dz = player.position.z - z.group.position.z;
@@ -936,7 +945,7 @@
                 weaponNode.rotation.x += (0 - weaponNode.rotation.x) * 0.12;
                 if (STATE.weapon === 'sword') swordGroup.rotation.z += (0 - swordGroup.rotation.z) * 0.15;
 
-                // Host Spawning & Smart AI
+                // Spawning & Enemy AI
                 if ((isHost || !conn) && STATE.waveActive && STATE.zulusToSpawnInWave > 0 && performance.now() - lastSpawn > CONFIG.baseSpawnInterval) {
                     createZulu();
                     STATE.zulusToSpawnInWave--;
@@ -968,7 +977,7 @@
                     });
                 }
 
-                // Lobby Wipe Trigger
+                // Lobby Wipe Check
                 if (conn && conn.open) {
                     if (STATE.isDead && STATE.remoteIsDead) triggerGameOver();
                 } else {
