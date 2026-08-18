@@ -1,39 +1,37 @@
-/* Zulu Wars weapon fixes - loaded after index.html game code. */
+/* Zulu Wars modular weapon fixes. */
 (function(){
-  'use strict';
+'use strict';
+function install(frame){
+ try{
+  var w=frame.contentWindow,d=frame.contentDocument;
+  if(!w||!d||!w.STATE)return false;
+  if(w.__ZULU_WEAPON_FIXES)return true;
+  w.__ZULU_WEAPON_FIXES=true;
   function resetReload(){
-    if(typeof STATE==='undefined') return;
-    STATE.reloading=false;
-    STATE.lastAttackTime=0;
-    var c=document.getElementById('reload-bar-container');
-    var b=document.getElementById('reload-bar');
-    if(c)c.style.display='none';
-    if(b)b.style.width='0%';
-    if(typeof weaponNode!=='undefined'&&weaponNode){weaponNode.position.z=-0.5;weaponNode.rotation.x=0;}
+   w.STATE.reloading=false;w.STATE.lastAttackTime=0;
+   var c=d.getElementById('reload-bar-container'),b=d.getElementById('reload-bar');
+   if(c)c.style.display='none';if(b)b.style.width='0%';
+   if(w.weaponNode){w.weaponNode.position.z=-0.5;w.weaponNode.rotation.x=0;}
   }
-  window.addEventListener('keydown',function(e){
-    if(e.code!=='KeyQ'&&e.code!=='KeyE') return;
-    if(typeof STATE==='undefined'||STATE.isDead||STATE.gameOver||!STATE.gameStarted)return;
-    resetReload();
-    STATE.weapon=STATE.weapon==='musket'?'sword':'musket';
-    if(typeof musketGroup!=='undefined')musketGroup.visible=STATE.weapon==='musket';
-    if(typeof swordGroup!=='undefined')swordGroup.visible=STATE.weapon==='sword';
-    var w=document.getElementById('weapon-val');
-    if(w)w.innerText=STATE.weapon==='musket'?'MUSKET':'SWORD';
-    if(typeof updateMusketCrosshair==='function')updateMusketCrosshair();
-  },true);
-  function patchTP(){
-    if(typeof window.pModel==='undefined') return false;
-    return true;
-  }
-  // Runtime safety patch: any visible third-person musket is aimed forward.
+  w.switchWeapon=function(){
+   if(w.STATE.isDead||w.STATE.gameOver||!w.STATE.gameStarted)return;
+   resetReload();
+   w.STATE.weapon=w.STATE.weapon==='musket'?'sword':'musket';
+   if(w.musketGroup)w.musketGroup.visible=w.STATE.weapon==='musket';
+   if(w.swordGroup)w.swordGroup.visible=w.STATE.weapon==='sword';
+   var el=d.getElementById('weapon-val');if(el)el.innerText=w.STATE.weapon==='musket'?'MUSKET':'SWORD';
+   if(typeof w.updateMusketCrosshair==='function')w.updateMusketCrosshair();
+  };
+  var btn=d.getElementById('btn-switch');
+  if(btn){btn.onclick=null;btn.addEventListener('click',function(e){e.preventDefault();w.switchWeapon();});}
+  w.addEventListener('keydown',function(e){if(e.code==='KeyQ'||e.code==='KeyE')w.switchWeapon();},true);
   setInterval(function(){
-    if(typeof STATE==='undefined')return;
-    if(typeof playerModel!=='undefined'&&playerModel){
-      playerModel.traverse(function(o){
-        if(o.name&&/musket/i.test(o.name)){o.rotation.x=-Math.PI/2;o.rotation.z=-0.10;}
-      });
-    }
-  },250);
-  window.ZuluWeaponFixes={resetReload:resetReload,patchTP:patchTP};
+   if(!w.remotePlayerMesh)return;
+   w.remotePlayerMesh.traverse(function(o){if(o.name&&/musket/i.test(o.name))o.rotation.set(-Math.PI/2,0,-0.10);});
+  },300);
+  return true;
+ }catch(e){return false;}
+}
+function boot(){var f=document.querySelector('iframe');if(!f)return;f.addEventListener('load',function(){setTimeout(function(){install(f);},150);});setTimeout(function(){install(f);},500);}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
 })();
