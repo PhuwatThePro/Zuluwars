@@ -5,261 +5,49 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>1879 Frontier Defense - Mountain Pass</title>
     <style>
-        * {
-            box-sizing: border-box;
-            user-select: none;
-            -webkit-user-select: none;
-            margin: 0;
-            padding: 0;
-        }
-        body, html {
-            width: 100%;
-            height: 100%;
-            overflow: hidden;
-            background-color: #000;
-            font-family: 'Courier New', Courier, monospace;
-            touch-action: none;
-        }
-        #canvas-container {
-            width: 100%;
-            height: 100%;
-            position: absolute;
-            top: 0;
-            left: 0;
-            z-index: 1;
-        }
-        #ui-layer {
-            position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
-            z-index: 10;
-            pointer-events: none;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-            padding: 15px;
-        }
-        .hud-panel {
-            background: rgba(20, 15, 10, 0.85);
-            border: 2px solid #8b5a2b;
-            color: #f0e6d2;
-            padding: 10px 15px;
-            border-radius: 4px;
-            font-weight: bold;
-            text-shadow: 1px 1px 2px #000;
-            pointer-events: auto;
-        }
-        #top-hud {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-        }
-        #hud-center {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 6px;
-        }
-        .icon-btn {
-            background: rgba(20, 15, 10, 0.85);
-            border: 2px solid #d4af37;
-            color: #f0e6d2;
-            padding: 8px 12px;
-            border-radius: 4px;
-            font-weight: bold;
-            cursor: pointer;
-            pointer-events: auto;
-            font-family: inherit;
-        }
+        * { box-sizing: border-box; user-select: none; -webkit-user-select: none; margin: 0; padding: 0; }
+        body, html { width: 100%; height: 100%; overflow: hidden; background-color: #000; font-family: 'Courier New', Courier, monospace; touch-action: none; }
+        #canvas-container { width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 1; }
+        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; pointer-events: none; display: flex; flex-direction: column; justify-content: space-between; padding: 15px; }
+        .hud-panel { background: rgba(20, 15, 10, 0.85); border: 2px solid #8b5a2b; color: #f0e6d2; padding: 10px 15px; border-radius: 4px; font-weight: bold; text-shadow: 1px 1px 2px #000; pointer-events: auto; }
+        #top-hud { display: flex; justify-content: space-between; align-items: flex-start; }
+        #hud-center { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+        .icon-btn { background: rgba(20, 15, 10, 0.85); border: 2px solid #d4af37; color: #f0e6d2; padding: 8px 12px; border-radius: 4px; font-weight: bold; cursor: pointer; pointer-events: auto; font-family: inherit; }
         .icon-btn:hover { background: #8b5a2b; }
-        #room-code-badge {
-            background: rgba(0, 0, 0, 0.85);
-            border: 1px solid #d4af37;
-            color: #d4af37;
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 11px;
-            display: none;
-        }
-        #crosshair {
-            position: absolute;
-            top: 50%; left: 50%;
-            width: 16px; height: 16px;
-            transform: translate(-50%, -50%);
-            pointer-events: none;
-            z-index: 5;
-        }
-        #crosshair::before, #crosshair::after {
-            content: '';
-            position: absolute;
-            background: rgba(255, 255, 255, 0.9);
-        }
+        #room-code-badge { background: rgba(0, 0, 0, 0.85); border: 1px solid #d4af37; color: #d4af37; padding: 4px 8px; border-radius: 4px; font-size: 11px; display: none; }
+        #crosshair { position: absolute; top: 50%; left: 50%; width: 16px; height: 16px; transform: translate(-50%, -50%); pointer-events: none; z-index: 5; }
+        #crosshair::before, #crosshair::after { content: ''; position: absolute; background: rgba(255, 255, 255, 0.9); }
         #crosshair::before { top: 7px; left: 0; width: 16px; height: 2px; }
         #crosshair::after { top: 0; left: 7px; width: 2px; height: 16px; }
-        #controls-layer {
-            position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
-            z-index: 8;
-            pointer-events: none;
-        }
-        .touch-zone {
-            position: absolute;
-            pointer-events: auto;
-        }
-        #touch-look {
-            top: 0; right: 0; width: 70%; height: 75%;
-        }
-        #joystick-bound {
-            bottom: 20px; left: 20px;
-            width: 120px; height: 120px;
-            background: rgba(255, 255, 255, 0.1);
-            border: 2px solid rgba(255, 255, 255, 0.3);
-            border-radius: 60px;
-            pointer-events: auto;
-            position: absolute;
-        }
-        #joystick-thumb {
-            position: absolute;
-            top: 35px; left: 35px;
-            width: 50px; height: 50px;
-            background: rgba(139, 90, 43, 0.8);
-            border: 2px solid #f0e6d2;
-            border-radius: 25px;
-            pointer-events: none;
-        }
-        #action-buttons {
-            position: absolute;
-            bottom: 20px; right: 20px;
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-            pointer-events: auto;
-        }
-        .btn {
-            width: 75px; height: 75px;
-            border-radius: 38px;
-            background: linear-gradient(145deg, #8b5a2b, #4a2e11);
-            border: 2px solid #d4af37;
-            color: #f0e6d2;
-            font-weight: bold;
-            font-size: 13px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.5);
-            text-transform: uppercase;
-            cursor: pointer;
-        }
-        .btn:active {
-            transform: scale(0.92);
-            background: linear-gradient(145deg, #4a2e11, #8b5a2b);
-        }
-        #btn-switch {
-            width: 55px; height: 55px;
-            border-radius: 28px;
-            align-self: flex-end;
-            background: #2b4a8b;
-        }
-        #reload-bar-container {
-            width: 150px; height: 10px;
-            background: rgba(0,0,0,0.5);
-            border: 1px solid #8b5a2b;
-            margin-top: 5px;
-            display: none;
-        }
-        #reload-bar {
-            width: 0%; height: 100%;
-            background: #d4af37;
-        }
-        #hit-indicator {
-            position: absolute;
-            top: 50%; left: 50%;
-            transform: translate(-50%, -50%);
-            width: 36px; height: 36px;
-            border: 3px solid #ff2222;
-            border-radius: 50%;
-            pointer-events: none;
-            opacity: 0;
-            transition: opacity 0.08s ease-out;
-            z-index: 6;
-        }
-        #wave-banner {
-            position: absolute;
-            top: 30%; left: 50%;
-            transform: translate(-50%, -50%);
-            text-align: center;
-            color: #d4af37;
-            z-index: 15;
-            pointer-events: none;
-            opacity: 0;
-            transition: opacity 0.5s ease;
-            text-shadow: 3px 3px 6px #000;
-        }
+        #controls-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 8; pointer-events: none; }
+        .touch-zone { position: absolute; pointer-events: auto; }
+        #touch-look { top: 0; right: 0; width: 70%; height: 75%; }
+        #joystick-bound { bottom: 20px; left: 20px; width: 120px; height: 120px; background: rgba(255, 255, 255, 0.1); border: 2px solid rgba(255, 255, 255, 0.3); border-radius: 60px; pointer-events: auto; position: absolute; }
+        #joystick-thumb { position: absolute; top: 35px; left: 35px; width: 50px; height: 50px; background: rgba(139, 90, 43, 0.8); border: 2px solid #f0e6d2; border-radius: 25px; pointer-events: none; }
+        #action-buttons { position: absolute; bottom: 20px; right: 20px; display: flex; flex-direction: column; gap: 12px; pointer-events: auto; }
+        .btn { width: 75px; height: 75px; border-radius: 38px; background: linear-gradient(145deg, #8b5a2b, #4a2e11); border: 2px solid #d4af37; color: #f0e6d2; font-weight: bold; font-size: 13px; display: flex; justify-content: center; align-items: center; box-shadow: 0 4px 6px rgba(0,0,0,0.5); text-transform: uppercase; cursor: pointer; }
+        .btn:active { transform: scale(0.92); background: linear-gradient(145deg, #4a2e11, #8b5a2b); }
+        #btn-switch { width: 55px; height: 55px; border-radius: 28px; align-self: flex-end; background: #2b4a8b; }
+        #reload-bar-container { width: 150px; height: 10px; background: rgba(0,0,0,0.5); border: 1px solid #8b5a2b; margin-top: 5px; display: none; }
+        #reload-bar { width: 0%; height: 100%; background: #d4af37; }
+        #hit-indicator { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 36px; height: 36px; border: 3px solid #ff2222; border-radius: 50%; pointer-events: none; opacity: 0; transition: opacity 0.08s ease-out; z-index: 6; }
+        #wave-banner { position: absolute; top: 30%; left: 50%; transform: translate(-50%, -50%); text-align: center; color: #d4af37; z-index: 15; pointer-events: none; opacity: 0; transition: opacity 0.5s ease; text-shadow: 3px 3px 6px #000; }
         #wave-banner h2 { font-size: 3.5rem; letter-spacing: 4px; }
         #wave-banner p { font-size: 1.2rem; color: #f0e6d2; margin-top: 5px; }
 
-        .modal-screen {
-            position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0, 0, 0, 0.88);
-            z-index: 25;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            color: #f0e6d2;
-            pointer-events: auto;
-        }
-        .modal-box {
-            background: #2a1f18;
-            border: 3px solid #8b5a2b;
-            padding: 25px 35px;
-            border-radius: 8px;
-            width: 340px;
-            text-align: center;
-            box-shadow: 0 0 20px rgba(0,0,0,0.8);
-        }
+        .modal-screen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.88); z-index: 25; display: flex; flex-direction: column; justify-content: center; align-items: center; color: #f0e6d2; pointer-events: auto; }
+        .modal-box { background: #2a1f18; border: 3px solid #8b5a2b; padding: 25px 35px; border-radius: 8px; width: 340px; text-align: center; box-shadow: 0 0 20px rgba(0,0,0,0.8); }
         .modal-box h2 { color: #d4af37; margin-bottom: 20px; border-bottom: 1px solid #8b5a2b; padding-bottom: 10px; }
         .setting-row { margin: 15px 0; display: flex; justify-content: space-between; align-items: center; }
         .toggle-group { display: flex; gap: 5px; }
-        .toggle-btn {
-            padding: 6px 12px;
-            border: 1px solid #8b5a2b;
-            background: #150f0b;
-            color: #aaa;
-            cursor: pointer;
-            font-weight: bold;
-        }
-        .toggle-btn.active {
-            background: #8b5a2b;
-            color: #fff;
-            border-color: #d4af37;
-        }
-        .input-field {
-            width: 100%;
-            padding: 10px;
-            margin-bottom: 12px;
-            background: #150f0b;
-            color: #d4af37;
-            border: 1px solid #8b5a2b;
-            font-family: inherit;
-            font-weight: bold;
-            font-size: 14px;
-            text-align: center;
-        }
+        .toggle-btn { padding: 6px 12px; border: 1px solid #8b5a2b; background: #150f0b; color: #aaa; cursor: pointer; font-weight: bold; }
+        .toggle-btn.active { background: #8b5a2b; color: #fff; border-color: #d4af37; }
+        .input-field { width: 100%; padding: 10px; margin-bottom: 12px; background: #150f0b; color: #d4af37; border: 1px solid #8b5a2b; font-family: inherit; font-weight: bold; font-size: 14px; text-align: center; }
         #game-over { display: none; background: rgba(50, 0, 0, 0.88); z-index: 20; }
         #game-over h1 { font-size: 3rem; color: #ff3333; margin-bottom: 10px; text-shadow: 2px 2px #000; }
-        .close-btn {
-            margin-top: 15px;
-            padding: 10px 20px;
-            font-size: 1rem;
-            background: #8b5a2b;
-            color: #fff;
-            border: 2px solid #d4af37;
-            cursor: pointer;
-            font-family: inherit;
-            width: 100%;
-        }
+        .close-btn { margin-top: 15px; padding: 10px 20px; font-size: 1rem; background: #8b5a2b; color: #fff; border: 2px solid #d4af37; cursor: pointer; font-family: inherit; width: 100%; }
         .hint-text { font-size: 11px; color: #aaa; margin-top: 4px; }
+        #spectator-msg { position: absolute; top: 20%; left: 50%; transform: translate(-50%, -50%); color: #ff4444; font-size: 1.8rem; font-weight: bold; text-shadow: 2px 2px 4px #000; display: none; z-index: 12; }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
     <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
@@ -268,6 +56,7 @@
     <div id="canvas-container"></div>
     <div id="crosshair"></div>
     <div id="hit-indicator"></div>
+    <div id="spectator-msg">YOU ARE DOWN - SPECTATING LOBBY</div>
 
     <div id="wave-banner">
         <h2 id="wave-title">WAVE 1</h2>
@@ -340,9 +129,9 @@
     <div id="game-over" class="modal-screen">
         <div class="modal-box">
             <h1>PASS OVERRUN</h1>
-            <p>The Zulu warriors breached your perimeter.</p>
+            <p>All defenders have fallen in battle.</p>
             <p style="margin-top: 10px;">Waves Survived: <span id="final-wave">1</span> | Total Defeated: <span id="final-score">0</span></p>
-            <button class="close-btn" onclick="resetGame()">HOLD THE PASS AGAIN</button>
+            <button class="close-btn" onclick="resetGame()">RESTART MATCH</button>
         </div>
     </div>
 
@@ -354,6 +143,8 @@
             reloading: false,
             lastAttackTime: 0,
             gameOver: false,
+            isDead: false,
+            remoteIsDead: false,
             wave: 1,
             zulusToSpawnInWave: 0,
             zulusRemainingInWave: 0,
@@ -378,7 +169,9 @@
         let conn = null;
         let isHost = false;
         let playerName = "Soldier";
+        let remotePlayerName = "Comrade";
         let remotePlayerMesh = null;
+        let zuluIdCounter = 0;
 
         const container = document.getElementById('canvas-container');
         const scene = new THREE.Scene();
@@ -422,7 +215,6 @@
 
         function buildMountains() {
             const mountainGroup = new THREE.Group();
-
             for (let i = -10; i <= 10; i++) {
                 const h = 35 + Math.random() * 20, r = 12 + Math.random() * 6;
                 const m = new THREE.Mesh(new THREE.ConeGeometry(r, h, 7), mountainMat);
@@ -468,29 +260,39 @@
             return false;
         }
 
-        // Mealbag Barricade
+        // Barricade
         const bagMat = new THREE.MeshStandardMaterial({ color: 0xb5a075, roughness: 0.9 });
         for (let i = -6; i <= 6; i++) {
             const angle = (i / 12) * Math.PI * 0.7;
             const bag = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.8, 0.8), bagMat);
             bag.position.set(Math.sin(angle) * 7.5, 0.4, -Math.cos(angle) * 7.5);
             bag.rotation.y = angle;
-            bag.castShadow = true;
-            bag.receiveShadow = true;
+            bag.castShadow = true; bag.receiveShadow = true;
             scene.add(bag);
         }
 
-        // Environment Trees
-        const woodMat = new THREE.MeshStandardMaterial({ color: 0x4a2e11, roughness: 0.8 });
-        const leafMat = new THREE.MeshStandardMaterial({ color: 0x475e2e, roughness: 0.9 });
-        for (let i = 0; i < 24; i++) {
-            const x = (Math.random() - 0.5) * 38;
-            const z = -15 - Math.random() * 30;
-            const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.5, 3), woodMat);
-            trunk.position.set(x, 1.5, z);
-            const leaves = new THREE.Mesh(new THREE.SphereGeometry(2.5, 6, 6), leafMat);
-            leaves.position.set(x, 4, z);
-            scene.add(trunk, leaves);
+        // Dynamic 3D Nametag Generator
+        function createNametagSprite(nameText) {
+            const canvas = document.createElement('canvas');
+            canvas.width = 256; canvas.height = 64;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = 'rgba(20, 15, 10, 0.75)';
+            ctx.strokeStyle = '#d4af37';
+            ctx.lineWidth = 4;
+            ctx.fillRect(4, 4, 248, 56);
+            ctx.strokeRect(4, 4, 248, 56);
+            ctx.font = 'Bold 26px Courier New';
+            ctx.fillStyle = '#f0e6d2';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(nameText, 128, 32);
+
+            const texture = new THREE.CanvasTexture(canvas);
+            const spriteMat = new THREE.SpriteMaterial({ map: texture });
+            const sprite = new THREE.Sprite(spriteMat);
+            sprite.scale.set(2.5, 0.625, 1);
+            sprite.position.y = 2.2;
+            return sprite;
         }
 
         // Materials & Soldier Builders
@@ -534,26 +336,6 @@
             rightBoot.position.set(0.18, 0.12, 0);
             pModel.add(leftBoot, rightBoot);
 
-            const leftArmGroup = new THREE.Group(); leftArmGroup.position.set(-0.38, 1.25, 0);
-            const leftArm = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.07, 0.65), tunicMat);
-            leftArm.position.y = -0.3; leftArmGroup.add(leftArm); pModel.add(leftArmGroup);
-
-            const rightArmGroup = new THREE.Group(); rightArmGroup.position.set(0.38, 1.25, 0);
-            const rightArm = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.07, 0.65), tunicMat);
-            rightArm.position.y = -0.3; rightArmGroup.add(rightArm); pModel.add(rightArmGroup);
-
-            const tpMusket = new THREE.Group();
-            const tpStock = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.09, 1.1), woodMat);
-            tpStock.position.set(0, 0, -0.3);
-            const tpBarrel = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 1.3), ironMat);
-            tpBarrel.rotation.x = Math.PI / 2; tpBarrel.position.set(0, 0.04, -0.6);
-            tpMusket.add(tpStock, tpBarrel);
-            tpMusket.position.set(0, -0.55, 0); tpMusket.rotation.x = -Math.PI / 2;
-            rightArmGroup.add(tpMusket);
-
-            rightArmGroup.rotation.set(1.2, -0.2, -0.1);
-            leftArmGroup.rotation.set(1.25, -0.55, 0.35);
-
             return pModel;
         }
 
@@ -573,12 +355,10 @@
         cameraNode.add(weaponNode);
 
         const musketGroup = new THREE.Group();
-        const stock = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.12, 1.2), woodMat);
+        const stock = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.12, 1.2), new THREE.MeshStandardMaterial({ color: 0x4a2e11 }));
         const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 1.4), ironMat);
         barrel.rotation.x = Math.PI / 2; barrel.position.set(0, 0.05, -0.3);
-        const bayonet = new THREE.Mesh(new THREE.ConeGeometry(0.02, 0.5, 4), new THREE.MeshStandardMaterial({ color: 0xdddddd, metalness: 0.9 }));
-        bayonet.rotation.x = -Math.PI / 2; bayonet.position.set(0, 0.05, -1.1);
-        musketGroup.add(stock, barrel, bayonet);
+        musketGroup.add(stock, barrel);
         weaponNode.add(musketGroup);
 
         const swordGroup = new THREE.Group();
@@ -594,37 +374,15 @@
         remotePlayerMesh.visible = false;
         scene.add(remotePlayerMesh);
 
-        // Smoke Particle Effects
-        const smokeParticles = [];
-        const smokeGeo = new THREE.SphereGeometry(0.25, 4, 4);
-        const smokeMat = new THREE.MeshBasicMaterial({ color: 0xdddddd, transparent: true, opacity: 0.7 });
-        for (let i = 0; i < 15; i++) {
-            const p = new THREE.Mesh(smokeGeo, smokeMat);
-            p.visible = false;
-            scene.add(p);
-            smokeParticles.push({ mesh: p, life: 0, vx: 0, vy: 0, vz: 0 });
-        }
+        let nametagSprite = null;
 
-        function triggerSmoke(pos, dir) {
-            smokeParticles.forEach(p => {
-                p.mesh.position.copy(pos);
-                p.mesh.visible = true;
-                p.mesh.scale.set(1, 1, 1);
-                p.life = 1.0;
-                p.vx = dir.x * 0.1 + (Math.random() - 0.5) * 0.05;
-                p.vy = dir.y * 0.1 + Math.random() * 0.05;
-                p.vz = dir.z * 0.1 + (Math.random() - 0.5) * 0.05;
-            });
-        }
-
-        // INPUT AND CAMERA CONTROL HANDLERS
+        // Input & Camera Controls
         let yaw = 0, pitch = 0;
         const input = { forward: 0, right: 0 };
         const keys = {};
 
-        // 1. Mouse Aiming & Pointer Lock (PC)
         renderer.domElement.addEventListener('click', () => {
-            if (STATE.gameStarted && !STATE.settingsOpen && !STATE.gameOver) {
+            if (STATE.gameStarted && !STATE.settingsOpen && !STATE.gameOver && !STATE.isDead) {
                 renderer.domElement.requestPointerLock();
             }
         });
@@ -637,7 +395,6 @@
             }
         });
 
-        // 2. Touch Controls (Mobile)
         const touchLookZone = document.getElementById('touch-look');
         let lookTouchId = null;
         let lastTouchX = 0, lastTouchY = 0;
@@ -646,8 +403,7 @@
             for (let t of e.changedTouches) {
                 if (lookTouchId === null) {
                     lookTouchId = t.identifier;
-                    lastTouchX = t.clientX;
-                    lastTouchY = t.clientY;
+                    lastTouchX = t.clientX; lastTouchY = t.clientY;
                 }
             }
         }, { passive: false });
@@ -655,13 +411,10 @@
         window.addEventListener('touchmove', (e) => {
             for (let t of e.changedTouches) {
                 if (t.identifier === lookTouchId) {
-                    const dx = t.clientX - lastTouchX;
-                    const dy = t.clientY - lastTouchY;
-                    yaw -= dx * 0.005;
-                    pitch -= dy * 0.005;
+                    yaw -= (t.clientX - lastTouchX) * 0.005;
+                    pitch -= (t.clientY - lastTouchY) * 0.005;
                     pitch = Math.max(-Math.PI / 2.3, Math.min(Math.PI / 2.3, pitch));
-                    lastTouchX = t.clientX;
-                    lastTouchY = t.clientY;
+                    lastTouchX = t.clientX; lastTouchY = t.clientY;
                 }
             }
         }, { passive: false });
@@ -672,7 +425,6 @@
             }
         });
 
-        // Touch Joystick
         const joystickBound = document.getElementById('joystick-bound');
         const joystickThumb = document.getElementById('joystick-thumb');
         let joyTouchId = null;
@@ -683,10 +435,7 @@
             let dy = t.clientY - (rect.top + 60);
             const dist = Math.sqrt(dx * dx + dy * dy);
             const maxR = 40;
-            if (dist > maxR) {
-                dx = (dx / dist) * maxR;
-                dy = (dy / dist) * maxR;
-            }
+            if (dist > maxR) { dx = (dx / dist) * maxR; dy = (dy / dist) * maxR; }
             joystickThumb.style.transform = `translate(${dx}px, ${dy}px)`;
             input.right = dx / maxR;
             input.forward = -dy / maxR;
@@ -694,10 +443,7 @@
 
         joystickBound.addEventListener('touchstart', (e) => {
             for (let t of e.changedTouches) {
-                if (joyTouchId === null) {
-                    joyTouchId = t.identifier;
-                    updateJoystick(t);
-                }
+                if (joyTouchId === null) { joyTouchId = t.identifier; updateJoystick(t); }
             }
         }, { passive: false });
 
@@ -710,22 +456,19 @@
         window.addEventListener('touchend', (e) => {
             for (let t of e.changedTouches) {
                 if (t.identifier === joyTouchId) {
-                    joyTouchId = null;
-                    input.forward = 0;
-                    input.right = 0;
+                    joyTouchId = null; input.forward = 0; input.right = 0;
                     joystickThumb.style.transform = `translate(0px, 0px)`;
                 }
             }
         });
 
-        // 3. Keyboard Inputs (PC)
         window.addEventListener('keydown', e => {
             keys[e.code] = true;
             if (e.code === 'KeyQ' || e.code === 'KeyE') switchWeapon();
         });
         window.addEventListener('keyup', e => keys[e.code] = false);
 
-        // PeerJS Setup
+        // PeerJS Network & Shared State Engine
         function initPeer(customId = null) {
             peer = customId ? new Peer(customId) : new Peer();
             peer.on('connection', (c) => {
@@ -743,7 +486,6 @@
             document.getElementById('room-code-badge').style.display = 'block';
             document.getElementById('room-code-val').innerText = code;
             document.getElementById('network-status').innerText = "HOSTING (WAITING)";
-
             startGame();
         }
 
@@ -767,24 +509,49 @@
                 document.getElementById('network-status').innerText = "ONLINE (P2P)";
                 remotePlayerMesh.visible = true;
                 setInterval(sendNetworkPacket, 50);
+
+                conn.send({ type: 'HANDSHAKE', name: playerName });
             });
 
             conn.on('data', (data) => {
-                if (remotePlayerMesh) {
+                if (data.type === 'HANDSHAKE') {
+                    remotePlayerName = data.name;
+                    if (nametagSprite) remotePlayerMesh.remove(nametagSprite);
+                    nametagSprite = createNametagSprite(remotePlayerName);
+                    remotePlayerMesh.add(nametagSprite);
+                } else if (data.type === 'SYNC') {
                     remotePlayerMesh.position.set(data.x, data.y, data.z);
                     remotePlayerMesh.rotation.y = data.yaw;
+                    STATE.remoteIsDead = data.isDead;
+                    remotePlayerMesh.visible = !data.isDead;
+
+                    if (!isHost && data.zulus) {
+                        syncZulusFromHost(data.zulus);
+                    }
+                } else if (data.type === 'HIT_ZULU') {
+                    if (isHost) {
+                        damageZulu(data.zuluId, data.damage);
+                    }
                 }
             });
         }
 
         function sendNetworkPacket() {
             if (conn && conn.open) {
-                conn.send({
+                const packet = {
+                    type: 'SYNC',
                     x: player.position.x,
                     y: player.position.y,
                     z: player.position.z,
-                    yaw: yaw
-                });
+                    yaw: yaw,
+                    isDead: STATE.isDead
+                };
+
+                if (isHost) {
+                    packet.zulus = zulus.map(z => ({ id: z.id, x: z.group.position.x, z: z.group.position.z, hp: z.hp }));
+                }
+
+                conn.send(packet);
             }
         }
 
@@ -796,34 +563,60 @@
         function startGame() {
             document.getElementById('lobby-modal').style.display = 'none';
             STATE.gameStarted = true;
-            startWave(1);
+            if (isHost || !conn) startWave(1);
         }
 
-        // Enemy & Wave System
+        // Shared Enemy Management Logic
         const zulus = [];
-        function createZulu() {
-            const group = new THREE.Group();
-            const zuluSkinMat = new THREE.MeshStandardMaterial({ color: 0x6e3b23, roughness: 0.85 });
-            const zuluShieldMat = new THREE.MeshStandardMaterial({ color: 0xd9c8a9, roughness: 0.7 });
+        const zuluMat = new THREE.MeshStandardMaterial({ color: 0x6e3b23, roughness: 0.85 });
 
-            const body = new THREE.Mesh(new THREE.CylinderGeometry(0.38, 0.35, 1.4), zuluSkinMat);
+        function createZulu(id = null, x = null, z = null) {
+            const group = new THREE.Group();
+            const body = new THREE.Mesh(new THREE.CylinderGeometry(0.38, 0.35, 1.4), zuluMat);
             body.position.y = 1.2; group.add(body);
-            const head = new THREE.Mesh(new THREE.SphereGeometry(0.28, 8, 8), zuluSkinMat);
+            const head = new THREE.Mesh(new THREE.SphereGeometry(0.28, 8, 8), zuluMat);
             head.position.y = 2.1; group.add(head);
 
-            const shield = new THREE.Mesh(new THREE.BoxGeometry(0.6, 1.3, 0.05), zuluShieldMat);
+            const shield = new THREE.Mesh(new THREE.BoxGeometry(0.6, 1.3, 0.05), new THREE.MeshStandardMaterial({ color: 0xd9c8a9 }));
             shield.position.set(-0.4, 1.2, 0.3); group.add(shield);
 
-            const spearShaft = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 2.2), woodMat);
-            spearShaft.rotation.x = Math.PI / 2; spearShaft.position.set(0.4, 1.2, 0.4);
-            group.add(spearShaft);
+            const spearShaft = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 2.2), new THREE.MeshStandardMaterial({ color: 0x4a2e11 }));
+            spearShaft.rotation.x = Math.PI / 2; spearShaft.position.set(0.4, 1.2, 0.4); group.add(spearShaft);
 
             const hitMesh = new THREE.Mesh(new THREE.SphereGeometry(1.2), new THREE.MeshBasicMaterial({ visible: false }));
             hitMesh.position.y = 1.2; group.add(hitMesh);
 
-            group.position.set((Math.random() - 0.5) * 36, 0, -45 - Math.random() * 10);
+            const zId = id || zuluIdCounter++;
+            const posX = x !== null ? x : (Math.random() - 0.5) * 36;
+            const posZ = z !== null ? z : (-45 - Math.random() * 10);
+
+            group.position.set(posX, 0, posZ);
             scene.add(group);
-            zulus.push({ group: group, hitTarget: hitMesh, hp: 2, skinMat: zuluSkinMat, animOffset: Math.random() * 10 });
+
+            const zObj = { id: zId, group: group, hitTarget: hitMesh, hp: 2, animOffset: Math.random() * 10 };
+            zulus.push(zObj);
+            return zObj;
+        }
+
+        function syncZulusFromHost(hostZulus) {
+            const hostIds = hostZulus.map(hz => hz.id);
+            for (let i = zulus.length - 1; i >= 0; i--) {
+                if (!hostIds.includes(zulus[i].id)) {
+                    scene.remove(zulus[i].group);
+                    zulus.splice(i, 1);
+                }
+            }
+
+            hostZulus.forEach(hz => {
+                let z = zulus.find(item => item.id === hz.id);
+                if (!z) {
+                    z = createZulu(hz.id, hz.x, hz.z);
+                } else {
+                    z.group.position.x = hz.x;
+                    z.group.position.z = hz.z;
+                    z.hp = hz.hp;
+                }
+            });
         }
 
         function setCameraMode(mode) {
@@ -831,10 +624,10 @@
             if (mode === '1P') {
                 camera.position.set(0, 0, 0);
                 playerModel.visible = false;
-                weaponNode.visible = true;
+                weaponNode.visible = !STATE.isDead;
             } else {
                 camera.position.set(0, 0.6, 3.5);
-                playerModel.visible = true;
+                playerModel.visible = !STATE.isDead;
                 weaponNode.visible = false;
             }
         }
@@ -863,7 +656,7 @@
         }
 
         function switchWeapon() {
-            if (STATE.reloading) return;
+            if (STATE.reloading || STATE.isDead) return;
             STATE.weapon = STATE.weapon === 'musket' ? 'sword' : 'musket';
             musketGroup.visible = STATE.weapon === 'musket';
             swordGroup.visible = STATE.weapon === 'sword';
@@ -876,20 +669,22 @@
             setTimeout(() => { ind.style.opacity = '0'; }, 90);
         }
 
-        function damageZulu(index, damageAmount) {
-            const z = zulus[index];
+        function damageZulu(zuluId, damageAmount) {
+            const idx = zulus.findIndex(z => z.id === zuluId);
+            if (idx === -1) return;
+
+            const z = zulus[idx];
             z.hp -= damageAmount;
             showHitFeedback();
-            z.skinMat.color.setHex(0xff3333);
-            setTimeout(() => { if (z.skinMat) z.skinMat.color.setHex(0x6e3b23); }, 120);
 
             if (z.hp <= 0) {
-                scene.remove(zulus[index].group);
-                zulus.splice(index, 1);
+                scene.remove(z.group);
+                zulus.splice(idx, 1);
                 STATE.score++;
                 STATE.zulusRemainingInWave--;
                 document.getElementById('score-val').innerText = STATE.score;
-                if (STATE.zulusRemainingInWave <= 0 && STATE.zulusToSpawnInWave <= 0) {
+
+                if (isHost && STATE.zulusRemainingInWave <= 0 && STATE.zulusToSpawnInWave <= 0) {
                     STATE.waveActive = false;
                     setTimeout(() => startWave(STATE.wave + 1), 3000);
                 }
@@ -898,7 +693,7 @@
 
         function performAttack() {
             const now = performance.now();
-            if (STATE.gameOver || !STATE.gameStarted || STATE.settingsOpen) return;
+            if (STATE.gameOver || !STATE.gameStarted || STATE.settingsOpen || STATE.isDead) return;
 
             if (STATE.weapon === 'musket') {
                 if (STATE.reloading) return;
@@ -909,17 +704,19 @@
                 weaponNode.position.z += 0.25;
                 weaponNode.rotation.x += 0.25;
 
-                const barrelWorldPos = new THREE.Vector3();
-                barrel.getWorldPosition(barrelWorldPos);
-                const dir = new THREE.Vector3();
-                camera.getWorldDirection(dir);
-                triggerSmoke(barrelWorldPos, dir);
-
+                const dir = camera.getWorldDirection(new THREE.Vector3());
                 const raycaster = new THREE.Raycaster(camera.getWorldPosition(new THREE.Vector3()), dir);
                 const hits = raycaster.intersectObjects(zulus.map(z => z.hitTarget));
+                
                 if (hits.length > 0) {
-                    const idx = zulus.findIndex(z => z.hitTarget === hits[0].object);
-                    if (idx !== -1) damageZulu(idx, CONFIG.musketDamage);
+                    const hitZulu = zulus.find(z => z.hitTarget === hits[0].object);
+                    if (hitZulu) {
+                        if (isHost || !conn) {
+                            damageZulu(hitZulu.id, CONFIG.musketDamage);
+                        } else {
+                            conn.send({ type: 'HIT_ZULU', zuluId: hitZulu.id, damage: CONFIG.musketDamage });
+                        }
+                    }
                 }
             } else {
                 if (now - STATE.lastAttackTime < CONFIG.swordCooldown) return;
@@ -933,7 +730,11 @@
                     const zPos = zulus[i].group.position.clone().add(new THREE.Vector3(0, 1.2, 0));
                     if (camPos.distanceTo(zPos) < CONFIG.swordRange) {
                         if (dir.dot(zPos.sub(camPos).normalize()) > 0.15) {
-                            damageZulu(i, CONFIG.swordDamage);
+                            if (isHost || !conn) {
+                                damageZulu(zulus[i].id, CONFIG.swordDamage);
+                            } else {
+                                conn.send({ type: 'HIT_ZULU', zuluId: zulus[i].id, damage: CONFIG.swordDamage });
+                            }
                             break;
                         }
                     }
@@ -958,17 +759,19 @@
             const time = clock.getElapsedTime();
 
             if (STATE.gameStarted && !STATE.gameOver) {
-                player.rotation.y = yaw;
-                cameraNode.rotation.x = pitch;
+                if (!STATE.isDead) {
+                    player.rotation.y = yaw;
+                    cameraNode.rotation.x = pitch;
 
-                let moveZ = input.forward + (keys['KeyW'] || keys['ArrowUp'] ? 1 : 0) - (keys['KeyS'] || keys['ArrowDown'] ? 1 : 0);
-                let moveX = input.right + (keys['KeyD'] || keys['ArrowRight'] ? 1 : 0) - (keys['KeyA'] || keys['ArrowLeft'] ? 1 : 0);
-                
-                const moveDir = new THREE.Vector3(moveX, 0, -moveZ).normalize();
-                if (moveDir.length() > 0) {
-                    moveDir.applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
-                    const nextPos = player.position.clone().addScaledVector(moveDir, 0.1);
-                    if (!checkMountainCollision(nextPos)) player.position.copy(nextPos);
+                    let moveZ = input.forward + (keys['KeyW'] || keys['ArrowUp'] ? 1 : 0) - (keys['KeyS'] || keys['ArrowDown'] ? 1 : 0);
+                    let moveX = input.right + (keys['KeyD'] || keys['ArrowRight'] ? 1 : 0) - (keys['KeyA'] || keys['ArrowLeft'] ? 1 : 0);
+                    
+                    const moveDir = new THREE.Vector3(moveX, 0, -moveZ).normalize();
+                    if (moveDir.length() > 0) {
+                        moveDir.applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
+                        const nextPos = player.position.clone().addScaledVector(moveDir, 0.1);
+                        if (!checkMountainCollision(nextPos)) player.position.copy(nextPos);
+                    }
                 }
 
                 if (STATE.reloading) {
@@ -985,38 +788,65 @@
                 weaponNode.rotation.x += (0 - weaponNode.rotation.x) * 0.12;
                 if (STATE.weapon === 'sword') swordGroup.rotation.z += (0 - swordGroup.rotation.z) * 0.15;
 
-                if (STATE.waveActive && STATE.zulusToSpawnInWave > 0 && performance.now() - lastSpawn > CONFIG.baseSpawnInterval) {
-                    createZulu(); STATE.zulusToSpawnInWave--; lastSpawn = performance.now();
+                // Host Spawning & Movement AI
+                if ((isHost || !conn) && STATE.waveActive && STATE.zulusToSpawnInWave > 0 && performance.now() - lastSpawn > CONFIG.baseSpawnInterval) {
+                    createZulu();
+                    STATE.zulusToSpawnInWave--;
+                    lastSpawn = performance.now();
                 }
 
-                zulus.forEach((z) => {
-                    const dir = player.position.clone().sub(z.group.position); dir.y = 0;
-                    if (dir.length() > 1.4) {
-                        dir.normalize(); z.group.position.addScaledVector(dir, CONFIG.baseSpeed);
-                        z.group.lookAt(z.group.position.x + dir.x, z.group.position.y, z.group.position.z + dir.z);
-                        z.group.rotation.z = Math.sin(time * 12 + z.animOffset) * 0.08;
-                    } else {
-                        STATE.hp -= CONFIG.zuluDamage * delta;
-                        document.getElementById('hp-val').innerText = Math.max(0, Math.ceil(STATE.hp));
-                        if (STATE.hp <= 0) triggerGameOver();
-                    }
-                });
+                if (isHost || !conn) {
+                    zulus.forEach((z) => {
+                        let targetPos = player.position;
+                        if (conn && conn.open && !STATE.remoteIsDead && (STATE.isDead || z.id % 2 === 0)) {
+                            targetPos = remotePlayerMesh.position;
+                        }
 
-                smokeParticles.forEach(p => {
-                    if (p.mesh.visible) {
-                        p.life -= delta * 1.5;
-                        p.mesh.position.addScaledVector(new THREE.Vector3(p.vx, p.vy, p.vz), 1);
-                        p.mesh.scale.addScalar(delta * 0.8);
-                        if (p.life <= 0) p.mesh.visible = false;
-                    }
-                });
+                        const dir = targetPos.clone().sub(z.group.position); dir.y = 0;
+                        if (dir.length() > 1.4) {
+                            dir.normalize(); z.group.position.addScaledVector(dir, CONFIG.baseSpeed);
+                            z.group.lookAt(z.group.position.x + dir.x, z.group.position.y, z.group.position.z + dir.z);
+                            z.group.rotation.z = Math.sin(time * 12 + z.animOffset) * 0.08;
+                        } else {
+                            if (targetPos === player.position && !STATE.isDead) {
+                                STATE.hp -= CONFIG.zuluDamage * delta;
+                                document.getElementById('hp-val').innerText = Math.max(0, Math.ceil(STATE.hp));
+                                if (STATE.hp <= 0) handlePlayerDeath();
+                            }
+                        }
+                    });
+                }
+
+                // Check Lobby Wipe Condition
+                if (conn && conn.open) {
+                    if (STATE.isDead && STATE.remoteIsDead) triggerGameOver();
+                } else {
+                    if (STATE.isDead) triggerGameOver();
+                }
             }
             renderer.render(scene, camera);
+        }
+
+        function handlePlayerDeath() {
+            STATE.isDead = true;
+            document.getElementById('hp-val').innerText = 0;
+            document.getElementById('spectator-msg').style.display = 'block';
+            playerModel.visible = false;
+            weaponNode.visible = false;
+            if (document.exitPointerLock) document.exitPointerLock();
+
+            if (conn && conn.open && !STATE.remoteIsDead) {
+                // Attach camera elevated behind remote player for spectating
+                remotePlayerMesh.add(cameraNode);
+                cameraNode.position.set(0, 3, 5);
+                cameraNode.rotation.x = -0.3;
+            }
         }
 
         function triggerGameOver() {
             STATE.gameOver = true;
             if (document.exitPointerLock) document.exitPointerLock();
+            document.getElementById('spectator-msg').style.display = 'none';
             document.getElementById('final-wave').innerText = STATE.wave;
             document.getElementById('final-score').innerText = STATE.score;
             document.getElementById('game-over').style.display = 'flex';
@@ -1025,12 +855,20 @@
         function resetGame() {
             zulus.forEach(z => scene.remove(z.group));
             zulus.length = 0;
-            STATE.hp = 100; STATE.score = 0; STATE.gameOver = false; STATE.reloading = false;
+            STATE.hp = 100; STATE.score = 0; STATE.gameOver = false; STATE.isDead = false; STATE.reloading = false;
+            
+            player.add(cameraNode);
+            cameraNode.position.set(0, 1.6, 0);
+            cameraNode.rotation.set(0, 0, 0);
             player.position.set(0, 0, 0);
+
             document.getElementById('hp-val').innerText = 100;
             document.getElementById('score-val').innerText = 0;
+            document.getElementById('spectator-msg').style.display = 'none';
             document.getElementById('game-over').style.display = 'none';
-            startWave(1);
+
+            setCameraMode(STATE.cameraMode);
+            if (isHost || !conn) startWave(1);
         }
 
         animate();
