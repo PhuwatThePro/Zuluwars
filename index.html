@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>1879 Frontier Defense - Multiplayer</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+            margin: 0;
+            padding: 0;
+        }
+        body, html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #000;
+            font-family: 'Courier New', Courier, monospace;
+            touch-action: none;
+        }
+        #canvas-container {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+        #ui-layer {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 10;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 15px;
+        }
+        .hud-panel {
+            background: rgba(20, 15, 10, 0.85);
+            border: 2px solid #8b5a2b;
+            color: #f0e6d2;
+            padding: 10px 15px;
+            border-radius: 4px;
+            font-weight: bold;
+            text-shadow: 1px 1px 2px #000;
+            pointer-events: auto;
+        }
+        #top-hud {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+        #hud-center {
+            display: flex;
+            gap: 10px;
+        }
+        .icon-btn {
+            background: rgba(20, 15, 10, 0.85);
+            border: 2px solid #d4af37;
+            color: #f0e6d2;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-weight: bold;
+            cursor: pointer;
+            pointer-events: auto;
+            font-family: inherit;
+        }
+        .icon-btn:hover { background: #8b5a2b; }
+        #crosshair {
+            position: absolute;
+            top: 50%; left: 50%;
+            width: 16px; height: 16px;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            z-index: 5;
+        }
+        #crosshair::before, #crosshair::after {
+            content: '';
+            position: absolute;
+            background: rgba(255, 255, 255, 0.9);
+        }
+        #crosshair::before { top: 7px; left: 0; width: 16px; height: 2px; }
+        #crosshair::after { top: 0; left: 7px; width: 2px; height: 16px; }
+        #controls-layer {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 8;
+            pointer-events: none;
+        }
+        .touch-zone {
+            position: absolute;
+            pointer-events: auto;
+        }
+        #touch-look {
+            top: 0; right: 0; width: 70%; height: 75%;
+        }
+        #joystick-bound {
+            bottom: 20px; left: 20px;
+            width: 120px; height: 120px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 60px;
+            pointer-events: auto;
+            position: absolute;
+        }
+        #joystick-thumb {
+            position: absolute;
+            top: 35px; left: 35px;
+            width: 50px; height: 50px;
+            background: rgba(139, 90, 43, 0.8);
+            border: 2px solid #f0e6d2;
+            border-radius: 25px;
+        }
+        #action-buttons {
+            position: absolute;
+            bottom: 20px; right: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            pointer-events: auto;
+        }
+        .btn {
+            width: 75px; height: 75px;
+            border-radius: 38px;
+            background: linear-gradient(145deg, #8b5a2b, #4a2e11);
+            border: 2px solid #d4af37;
+            color: #f0e6d2;
+            font-weight: bold;
+            font-size: 13px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.5);
+            text-transform: uppercase;
+            cursor: pointer;
+        }
+        .btn:active {
+            transform: scale(0.92);
+            background: linear-gradient(145deg, #4a2e11, #8b5a2b);
+        }
+        #btn-switch {
+            width: 55px; height: 55px;
+            border-radius: 28px;
+            align-self: flex-end;
+            background: #2b4a8b;
+        }
+        #reload-bar-container {
+            width: 150px; height: 10px;
+            background: rgba(0,0,0,0.5);
+            border: 1px solid #8b5a2b;
+            margin-top: 5px;
+            display: none;
+        }
+        #reload-bar {
+            width: 0%; height: 100%;
+            background: #d4af37;
+        }
+        #hit-indicator {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            width: 36px; height: 36px;
+            border: 3px solid #ff2222;
+            border-radius: 50%;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.08s ease-out;
+            z-index: 6;
+        }
+        #wave-banner {
+            position: absolute;
+            top: 30%; left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            color: #d4af37;
+            z-index: 15;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+            text-shadow: 3px 3px 6px #000;
+        }
+        #wave-banner h2 { font-size: 3.5rem; letter-spacing: 4px; }
+        #wave-banner p { font-size: 1.2rem; color: #f0e6d2; margin-top: 5px; }
+
+        .modal-screen {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.88);
+            z-index: 25;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: #f0e6d2;
+            pointer-events: auto;
+        }
+        .modal-box {
+            background: #2a1f18;
+            border: 3px solid #8b5a2b;
+            padding: 25px 35px;
+            border-radius: 8px;
+            width: 340px;
+            text-align: center;
+            box-shadow: 0 0 20px rgba(0,0,0,0.8);
+        }
+        .modal-box h2 { color: #d4af37; margin-bottom: 20px; border-bottom: 1px solid #8b5a2b; padding-bottom: 10px; }
+        .setting-row { margin: 15px 0; display: flex; justify-content: space-between; align-items: center; }
+        .toggle-group { display: flex; gap: 5px; }
+        .toggle-btn {
+            padding: 6px 12px;
+            border: 1px solid #8b5a2b;
+            background: #150f0b;
+            color: #aaa;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .toggle-btn.active {
+            background: #8b5a2b;
+            color: #fff;
+            border-color: #d4af37;
+        }
+        .input-field {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 12px;
+            background: #150f0b;
+            color: #d4af37;
+            border: 1px solid #8b5a2b;
+            font-family: inherit;
+            font-weight: bold;
+            font-size: 14px;
+            text-align: center;
+        }
+        #game-over { display: none; background: rgba(50, 0, 0, 0.88); z-index: 20; }
+        #game-over h1 { font-size: 3rem; color: #ff3333; margin-bottom: 10px; text-shadow: 2px 2px #000; }
+        .close-btn {
+            margin-top: 15px;
+            padding: 10px 20px;
+            font-size: 1rem;
+            background: #8b5a2b;
+            color: #fff;
+            border: 2px solid #d4af37;
+            cursor: pointer;
+            font-family: inherit;
+            width: 100%;
+        }
+        .hint-text { font-size: 11px; color: #aaa; margin-top: 4px; }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+    <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+</head>
+<body>
+    <div id="canvas-container"></div>
+    <div id="crosshair"></div>
+    <div id="hit-indicator"></div>
+
+    <div id="wave-banner">
+        <h2 id="wave-title">WAVE 1</h2>
+        <p id="wave-subtitle">DEFEND THE PASS</p>
+    </div>
+
+    <div id="ui-layer">
+        <div id="top-hud">
+            <div class="hud-panel">
+                <div>SOLDIER HP: <span id="hp-val">100</span>%</div>
+                <div>KILLS: <span id="score-val">0</span></div>
+                <div style="color: #d4af37; margin-top: 4px;">WAVE: <span id="wave-val">1</span></div>
+                <div style="font-size: 10px; color: #88ff88; margin-top: 4px;" id="network-status">OFFLINE</div>
+            </div>
+            <div id="hud-center">
+                <button class="icon-btn" onclick="toggleSettings()">⚙ SETTINGS</button>
+            </div>
+            <div class="hud-panel" style="text-align: right;">
+                <div>WEAPON: <span id="weapon-val">MARTINI-HENRY</span></div>
+                <div id="ammo-val">READY</div>
+                <div id="reload-bar-container"><div id="reload-bar"></div></div>
+                <div class="hint-text">[L-Click/Btn]: Fire | [Q/E]: Swap</div>
+            </div>
+        </div>
+    </div>
+
+    <div id="controls-layer">
+        <div id="touch-look" class="touch-zone"></div>
+        <div id="joystick-bound"><div id="joystick-thumb"></div></div>
+        <div id="action-buttons">
+            <button id="btn-switch" class="btn">SWAP</button>
+            <button id="btn-attack" class="btn">FIRE</button>
+        </div>
+    </div>
+
+    <!-- MULTIPLAYER LOBBY MODAL -->
+    <div id="lobby-modal" class="modal-screen">
+        <div class="modal-box">
+            <h2>FRONTIER LOBBY</h2>
+            <input type="text" id="player-name" class="input-field" placeholder="SOLDIER NAME" maxlength="12" value="Private">
+            
+            <button class="close-btn" style="background: #2b4a8b; margin-top: 0; margin-bottom: 12px;" onclick="createRoom()">HOST ROOM (GENERATE CODE)</button>
+            
+            <div style="display: flex; gap: 5px; margin-bottom: 10px;">
+                <input type="text" id="room-code-input" class="input-field" placeholder="4-DIGIT CODE" maxlength="4" style="margin-bottom:0; width:60%;">
+                <button class="toggle-btn" style="width:40%; background:#8b5a2b; color:#fff;" onclick="joinRoom()">JOIN</button>
+            </div>
+
+            <button class="close-btn" style="background: #444;" onclick="startSingleplayer()">PLAY SINGLEPLAYER</button>
+
+            <div id="lobby-status" style="margin-top: 15px; font-size: 12px; color: #d4af37; min-height: 18px;"></div>
+        </div>
+    </div>
+
+    <!-- SETTINGS MODAL -->
+    <div id="settings-modal" class="modal-screen" style="display: none;">
+        <div class="modal-box">
+            <h2>SETTINGS</h2>
+            <div class="setting-row">
+                <span>CAMERA VIEW</span>
+                <div class="toggle-group">
+                    <button id="btn-cam-1p" class="toggle-btn active" onclick="setCameraMode('1P')">1st Person</button>
+                    <button id="btn-cam-3p" class="toggle-btn" onclick="setCameraMode('3P')">3rd Person</button>
+                </div>
+            </div>
+            <button class="close-btn" onclick="toggleSettings()">RESUME GAME</button>
+        </div>
+    </div>
+
+    <!-- GAME OVER MODAL -->
+    <div id="game-over" class="modal-screen">
+        <div class="modal-box">
+            <h1>PASS OVERRUN</h1>
+            <p>The Zulu warriors breached your perimeter.</p>
+            <p style="margin-top: 10px;">Waves Survived: <span id="final-wave">1</span> | Total Defeated: <span id="final-score">0</span></p>
+            <button class="close-btn" onclick="resetGame()">HOLD THE PASS AGAIN</button>
+        </div>
+    </div>
+
+    <script>
+        const STATE = {
+            hp: 100,
+            score: 0,
+            weapon: 'musket',
+            reloading: false,
+            lastAttackTime: 0,
+            gameOver: false,
+            wave: 1,
+            zulusToSpawnInWave: 0,
+            zulusRemainingInWave: 0,
+            waveActive: false,
+            cameraMode: '1P',
+            settingsOpen: false,
+            gameStarted: false
+        };
+
+        const CONFIG = {
+            musketCooldown: 1800,
+            swordCooldown: 800,
+            swordRange: 5.5,
+            baseSpeed: 0.08,
+            baseSpawnInterval: 2200,
+            zuluDamage: 10,
+            musketDamage: 2,
+            swordDamage: 1
+        };
+
+        let peer = null;
+        let conn = null;
+        let isHost = false;
+        let playerName = "Soldier";
+        let remotePlayerMesh = null;
+        let remotePlayerNameTag = null;
+
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x95a5b5);
+        scene.fog = new THREE.FogExp2(0x95a5b5, 0.010);
+
+        const camera = new THREE.PerspectiveCamera(60, container.clientWidth / container.clientHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(container.clientWidth, container.clientHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        container.appendChild(renderer.domElement);
+
+        const ambientLight = new THREE.AmbientLight(0xffeedd, 1.2);
+        scene.add(ambientLight);
+
+        const sunLight = new THREE.DirectionalLight(0xfff5ea, 1.1);
+        sunLight.position.set(0, 60, -40);
+        sunLight.castShadow = true;
+        scene.add(sunLight);
+
+        // Valley Ground
+        const ground = new THREE.Mesh(
+            new THREE.PlaneGeometry(300, 300),
+            new THREE.MeshStandardMaterial({ color: 0x8a7343, roughness: 0.95 })
+        );
+        ground.rotation.x = -Math.PI / 2;
+        ground.receiveShadow = true;
+        scene.add(ground);
+
+        // Mountains
+        const mountainMat = new THREE.MeshStandardMaterial({ color: 0x3d3123, roughness: 0.9 });
+        const mountainColliders = [];
+
+        function buildMountains() {
+            const mountainGroup = new THREE.Group();
+            for (let i = -10; i <= 10; i++) {
+                const h = 35 + Math.random() * 20, r = 12 + Math.random() * 6;
+                const m = new THREE.Mesh(new THREE.ConeGeometry(r, h, 7), mountainMat);
+                const px = i * 6, pz = 18 + Math.random() * 6;
+                m.position.set(px, h / 2, pz);
+                mountainGroup.add(m);
+                mountainColliders.push({ x: px, z: pz, radius: r * 0.75 });
+            }
+            for (let z = -55; z <= 20; z += 7) {
+                const h = 30 + Math.random() * 15, r = 10 + Math.random() * 5;
+                const m = new THREE.Mesh(new THREE.ConeGeometry(r, h, 6), mountainMat);
+                const px = -24 - Math.random() * 6;
+                m.position.set(px, h / 2, z);
+                mountainGroup.add(m);
+                mountainColliders.push({ x: px, z: z, radius: r * 0.75 });
+            }
+            for (let z = -55; z <= 20; z += 7) {
+                const h = 30 + Math.random() * 15, r = 10 + Math.random() * 5;
+                const m = new THREE.Mesh(new THREE.ConeGeometry(r, h, 6), mountainMat);
+                const px = 24 + Math.random() * 6;
+                m.position.set(px, h / 2, z);
+                mountainGroup.add(m);
+                mountainColliders.push({ x: px, z: z, radius: r * 0.75 });
+            }
+            scene.add(mountainGroup);
+        }
+        buildMountains();
+
+        function checkMountainCollision(pos) {
+            if (pos.x < -21.5 || pos.x > 21.5 || pos.z > 13 || pos.z < -52) return true;
+            for (let c of mountainColliders) {
+                const dx = pos.x - c.x, dz = pos.z - c.z;
+                if (dx * dx + dz * dz < c.radius * c.radius) return true;
+            }
+            return false;
+        }
+
+        // Materials & Soldier Builders
+        const tunicMat = new THREE.MeshStandardMaterial({ color: 0xa81c1c, roughness: 0.7 }); 
+        const pantsMat = new THREE.MeshStandardMaterial({ color: 0x1c2738, roughness: 0.8 }); 
+        const helmetMat = new THREE.MeshStandardMaterial({ color: 0xeee8dc, roughness: 0.5 }); 
+        const skinMat = new THREE.MeshStandardMaterial({ color: 0xd4a574, roughness: 0.8 });
+        const beltMat = new THREE.MeshStandardMaterial({ color: 0xf5f5f5, roughness: 0.5 });
+        const bootMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.9 });
+        const woodMat = new THREE.MeshStandardMaterial({ color: 0x4a2e11, roughness: 0.8 });
+        const ironMat = new THREE.MeshStandardMaterial({ color: 0x222222, metalness: 0.8 });
+
+        function createSoldierMesh() {
+            const pModel = new THREE.Group();
+            const torso = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.85, 0.35), tunicMat);
+            torso.position.y = 0.95; pModel.add(torso);
+
+            const headMesh = new THREE.Mesh(new THREE.SphereGeometry(0.2, 8, 8), skinMat);
+            headMesh.position.y = 1.52; pModel.add(headMesh);
+
+            const helmetDome = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.25, 0.25, 12), helmetMat);
+            helmetDome.position.y = 1.68;
+            const helmetBrim = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.34, 0.04, 12), helmetMat);
+            helmetBrim.position.y = 1.58;
+            pModel.add(helmetDome, helmetBrim);
+
+            const leftLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.11, 0.75), pantsMat);
+            leftLeg.position.set(-0.18, 0.4, 0);
+            const rightLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.11, 0.75), pantsMat);
+            rightLeg.position.set(0.18, 0.4, 0);
+            pModel.add(leftLeg, rightLeg);
+
+            const leftArmGroup = new THREE.Group(); leftArmGroup.position.set(-0.38, 1.25, 0);
+            const leftArm = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.07, 0.65), tunicMat);
+            leftArm.position.y = -0.3; leftArmGroup.add(leftArm); pModel.add(leftArmGroup);
+
+            const rightArmGroup = new THREE.Group(); rightArmGroup.position.set(0.38, 1.25, 0);
+            const rightArm = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.07, 0.65), tunicMat);
+            rightArm.position.y = -0.3; rightArmGroup.add(rightArm); pModel.add(rightArmGroup);
+
+            const tpMusket = new THREE.Group();
+            const tpStock = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.09, 1.1), woodMat);
+            tpStock.position.set(0, 0, -0.3);
+            const tpBarrel = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 1.3), ironMat);
+            tpBarrel.rotation.x = Math.PI / 2; tpBarrel.position.set(0, 0.04, -0.6);
+            tpMusket.add(tpStock, tpBarrel);
+            tpMusket.position.set(0, -0.55, 0); tpMusket.rotation.x = -Math.PI / 2;
+            rightArmGroup.add(tpMusket);
+
+            rightArmGroup.rotation.set(1.2, -0.2, -0.1);
+            leftArmGroup.rotation.set(1.25, -0.55, 0.35);
+
+            return pModel;
+        }
+
+        const player = new THREE.Group();
+        scene.add(player);
+        const playerModel = createSoldierMesh();
+        player.add(playerModel);
+        playerModel.visible = false;
+
+        const cameraNode = new THREE.Group();
+        cameraNode.position.set(0, 1.6, 0);
+        player.add(cameraNode);
+        cameraNode.add(camera);
+
+        const weaponNode = new THREE.Group();
+        weaponNode.position.set(0.35, -0.3, -0.5);
+        cameraNode.add(weaponNode);
+
+        const musketGroup = new THREE.Group();
+        const stock = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.12, 1.2), woodMat);
+        const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 1.4), ironMat);
+        barrel.rotation.x = Math.PI / 2; barrel.position.set(0, 0.05, -0.3);
+        musketGroup.add(stock, barrel);
+        weaponNode.add(musketGroup);
+
+        const swordGroup = new THREE.Group();
+        const swordBlade = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.9, 0.01), new THREE.MeshStandardMaterial({ color: 0xeeeeee, metalness: 0.95 }));
+        swordBlade.position.set(0, 0.45, 0);
+        swordGroup.add(swordBlade);
+        swordGroup.rotation.x = -Math.PI / 3; swordGroup.position.set(0, -0.1, -0.2);
+        swordGroup.visible = false;
+        weaponNode.add(swordGroup);
+
+        // Remote Player Model Creation
+        remotePlayerMesh = createSoldierMesh();
+        remotePlayerMesh.visible = false;
+        scene.add(remotePlayerMesh);
+
+        // PeerJS Multiplayer Implementation
+        function initPeer(customId = null) {
+            peer = customId ? new Peer(customId) : new Peer();
+            const status = document.getElementById('lobby-status');
+
+            peer.on('open', (id) => {
+                if (isHost) {
+                    const code = id.replace('frontier-pass-', '');
+                    status.innerText = `ROOM CODE: ${code} (WAITING FOR PLAYER...)`;
+                }
+            });
+
+            peer.on('connection', (c) => {
+                conn = c;
+                setupNetwork();
+            });
+
+            peer.on('error', (err) => {
+                status.innerText = "Connection error. Try again.";
+            });
+        }
+
+        function createRoom() {
+            playerName = document.getElementById('player-name').value || "Host";
+            const code = Math.floor(1000 + Math.random() * 9000);
+            isHost = true;
+            initPeer(`frontier-pass-${code}`);
+        }
+
+        function joinRoom() {
+            playerName = document.getElementById('player-name').value || "Client";
+            const code = document.getElementById('room-code-input').value;
+            if (code.length !== 4) return alert("Enter 4-digit room code.");
+
+            document.getElementById('lobby-status').innerText = "CONNECTING...";
+            initPeer();
+            peer.on('open', () => {
+                conn = peer.connect(`frontier-pass-${code}`);
+                setupNetwork();
+            });
+        }
+
+        function setupNetwork() {
+            conn.on('open', () => {
+                document.getElementById('lobby-modal').style.display = 'none';
+                document.getElementById('network-status').innerText = "ONLINE (P2P)";
+                remotePlayerMesh.visible = true;
+                STATE.gameStarted = true;
+                startWave(1);
+
+                setInterval(sendNetworkPacket, 50);
+            });
+
+            conn.on('data', (data) => {
+                if (remotePlayerMesh) {
+                    remotePlayerMesh.position.set(data.x, data.y, data.z);
+                    remotePlayerMesh.rotation.y = data.yaw;
+                }
+            });
+        }
+
+        function sendNetworkPacket() {
+            if (conn && conn.open) {
+                conn.send({
+                    x: player.position.x,
+                    y: player.position.y,
+                    z: player.position.z,
+                    yaw: yaw
+                });
+            }
+        }
+
+        function startSingleplayer() {
+            document.getElementById('lobby-modal').style.display = 'none';
+            STATE.gameStarted = true;
+            startWave(1);
+        }
+
+        // Enemy & Combat Core
+        const zulus = [];
+        function createZulu() {
+            const group = new THREE.Group();
+            const zSkin = new THREE.MeshStandardMaterial({ color: 0x6e3b23, roughness: 0.85 });
+            const body = new THREE.Mesh(new THREE.CylinderGeometry(0.38, 0.35, 1.4), zSkin);
+            body.position.y = 1.2; group.add(body);
+            const head = new THREE.Mesh(new THREE.SphereGeometry(0.28, 8, 8), zSkin);
+            head.position.y = 2.1; group.add(head);
+
+            const hitMesh = new THREE.Mesh(new THREE.SphereGeometry(1.2), new THREE.MeshBasicMaterial({ visible: false }));
+            hitMesh.position.y = 1.2; group.add(hitMesh);
+
+            group.position.set((Math.random() - 0.5) * 36, 0, -45 - Math.random() * 10);
+            scene.add(group);
+            zulus.push({ group: group, hitTarget: hitMesh, hp: 2, skinMat: zSkin, animOffset: Math.random() * 10 });
+        }
+
+        function setCameraMode(mode) {
+            STATE.cameraMode = mode;
+            if (mode === '1P') {
+                camera.position.set(0, 0, 0);
+                playerModel.visible = false;
+                weaponNode.visible = true;
+            } else {
+                camera.position.set(0, 0.6, 3.5);
+                playerModel.visible = true;
+                weaponNode.visible = false;
+            }
+        }
+
+        function toggleSettings() {
+            STATE.settingsOpen = !STATE.settingsOpen;
+            document.getElementById('settings-modal').style.display = STATE.settingsOpen ? 'flex' : 'none';
+        }
+
+        function startWave(num) {
+            STATE.wave = num;
+            STATE.zulusToSpawnInWave = 4 + num * 4;
+            STATE.zulusRemainingInWave = STATE.zulusToSpawnInWave;
+            STATE.waveActive = false;
+            document.getElementById('wave-val').innerText = STATE.wave;
+            setTimeout(() => { STATE.waveActive = true; }, 2000);
+        }
+
+        let yaw = 0, pitch = 0, lastSpawn = 0;
+        const input = { forward: 0, right: 0 };
+        const keys = {};
+
+        window.addEventListener('keydown', e => {
+            keys[e.code] = true;
+            if (e.code === 'KeyQ' || e.code === 'KeyE') switchWeapon();
+        });
+        window.addEventListener('keyup', e => keys[e.code] = false);
+
+        function switchWeapon() {
+            if (STATE.reloading) return;
+            STATE.weapon = STATE.weapon === 'musket' ? 'sword' : 'musket';
+            musketGroup.visible = STATE.weapon === 'musket';
+            swordGroup.visible = STATE.weapon === 'sword';
+            document.getElementById('weapon-val').innerText = STATE.weapon === 'musket' ? 'MARTINI-HENRY' : 'SWORD';
+        }
+
+        function performAttack() {
+            const now = performance.now();
+            if (STATE.gameOver || !STATE.gameStarted) return;
+
+            if (STATE.weapon === 'musket') {
+                if (STATE.reloading) return;
+                STATE.reloading = true;
+                STATE.lastAttackTime = now;
+                document.getElementById('reload-bar-container').style.display = 'block';
+
+                const dir = new THREE.Vector3();
+                camera.getWorldDirection(dir);
+                const raycaster = new THREE.Raycaster(camera.getWorldPosition(new THREE.Vector3()), dir);
+                const hits = raycaster.intersectObjects(zulus.map(z => z.hitTarget));
+                if (hits.length > 0) {
+                    const idx = zulus.findIndex(z => z.hitTarget === hits[0].object);
+                    if (idx !== -1) {
+                        zulus[idx].hp -= CONFIG.musketDamage;
+                        if (zulus[idx].hp <= 0) {
+                            scene.remove(zulus[idx].group);
+                            zulus.splice(idx, 1);
+                            STATE.score++;
+                            document.getElementById('score-val').innerText = STATE.score;
+                        }
+                    }
+                }
+            } else {
+                if (now - STATE.lastAttackTime < CONFIG.swordCooldown) return;
+                STATE.lastAttackTime = now;
+            }
+        }
+
+        document.getElementById('btn-attack').addEventListener('click', performAttack);
+        document.getElementById('btn-switch').addEventListener('click', switchWeapon);
+        window.addEventListener('mousedown', (e) => { if (e.button === 0 && STATE.gameStarted) performAttack(); });
+
+        const clock = new THREE.Clock();
+        function animate() {
+            requestAnimationFrame(animate);
+            const delta = clock.getDelta();
+            const time = clock.getElapsedTime();
+
+            if (STATE.gameStarted && !STATE.gameOver) {
+                player.rotation.y = yaw;
+                cameraNode.rotation.x = pitch;
+
+                let moveZ = input.forward + (keys['KeyW'] ? 1 : 0) - (keys['KeyS'] ? 1 : 0);
+                let moveX = input.right + (keys['KeyD'] ? 1 : 0) - (keys['KeyA'] ? 1 : 0);
+                
+                const moveDir = new THREE.Vector3(moveX, 0, -moveZ).normalize();
+                moveDir.applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
+                const nextPos = player.position.clone().addScaledVector(moveDir, 0.1);
+                if (!checkMountainCollision(nextPos)) player.position.copy(nextPos);
+
+                if (STATE.reloading) {
+                    const elapsed = performance.now() - STATE.lastAttackTime;
+                    const progress = Math.min(elapsed / CONFIG.musketCooldown, 1.0);
+                    document.getElementById('reload-bar').style.width = `${progress * 100}%`;
+                    if (progress >= 1.0) {
+                        STATE.reloading = false;
+                        document.getElementById('reload-bar-container').style.display = 'none';
+                    }
+                }
+
+                if (STATE.waveActive && STATE.zulusToSpawnInWave > 0 && performance.now() - lastSpawn > CONFIG.baseSpawnInterval) {
+                    createZulu(); STATE.zulusToSpawnInWave--; lastSpawn = performance.now();
+                }
+
+                zulus.forEach((z) => {
+                    const dir = player.position.clone().sub(z.group.position); dir.y = 0;
+                    if (dir.length() > 1.4) {
+                        dir.normalize(); z.group.position.addScaledVector(dir, CONFIG.baseSpeed);
+                        z.group.lookAt(z.group.position.x + dir.x, z.group.position.y, z.group.position.z + dir.z);
+                    } else {
+                        STATE.hp -= CONFIG.zuluDamage * delta;
+                        document.getElementById('hp-val').innerText = Math.max(0, Math.ceil(STATE.hp));
+                    }
+                });
+            }
+            renderer.render(scene, camera);
+        }
+        animate();
+    </script>
+</body>
+</html>
