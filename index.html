@@ -30,7 +30,10 @@
         #btn-switch { width: 55px; height: 55px; border-radius: 28px; align-self: flex-end; background: #2b4a8b; }
         #reload-bar-container { width: 150px; height: 10px; background: rgba(0,0,0,0.5); border: 1px solid #8b5a2b; margin-top: 5px; display: none; }
         #reload-bar { width: 0%; height: 100%; background: #d4af37; }
-        #hit-indicator { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 36px; height: 36px; border: 3px solid #ff2222; border-radius: 50%; pointer-events: none; opacity: 0; transition: opacity 0.08s ease-out; z-index: 6; }
+        
+        /* Red Circle Hit Indicator HUD */
+        #hit-indicator { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 42px; height: 42px; border: 3px solid #ff2222; border-radius: 50%; pointer-events: none; opacity: 0; transition: opacity 0.05s ease-out; z-index: 6; }
+        
         #wave-banner { position: absolute; top: 30%; left: 50%; transform: translate(-50%, -50%); text-align: center; color: #d4af37; z-index: 15; pointer-events: none; opacity: 0; transition: opacity 0.5s ease; text-shadow: 3px 3px 6px #000; }
         #wave-banner h2 { font-size: 3.5rem; letter-spacing: 4px; }
         #wave-banner p { font-size: 1.2rem; color: #f0e6d2; margin-top: 5px; }
@@ -376,6 +379,78 @@
 
         let nametagSprite = null;
 
+        // Visual Effects Systems: Gun Smoke & 3D Red Hit Rings
+        const smokeParticles = [];
+        const smokeGeo = new THREE.SphereGeometry(0.15, 6, 6);
+
+        function spawnGunSmoke(pos, dir) {
+            for (let i = 0; i < 14; i++) {
+                const mat = new THREE.MeshBasicMaterial({ color: 0xd0d0d0, transparent: true, opacity: 0.75 });
+                const mesh = new THREE.Mesh(smokeGeo, mat);
+                mesh.position.copy(pos);
+                mesh.position.x += (Math.random() - 0.5) * 0.15;
+                mesh.position.y += (Math.random() - 0.5) * 0.15;
+                mesh.position.z += (Math.random() - 0.5) * 0.15;
+
+                const speed = 2.0 + Math.random() * 3.5;
+                const vel = dir.clone().multiplyScalar(speed);
+                vel.x += (Math.random() - 0.5) * 1.5;
+                vel.y += Math.random() * 1.8 + 0.6;
+                vel.z += (Math.random() - 0.5) * 1.5;
+
+                const scale = 0.8 + Math.random() * 0.6;
+                mesh.scale.set(scale, scale, scale);
+
+                scene.add(mesh);
+                smokeParticles.push({ mesh: mesh, vel: vel, opacity: 0.75 });
+            }
+        }
+
+        function updateGunSmoke(delta) {
+            for (let i = smokeParticles.length - 1; i >= 0; i--) {
+                const sp = smokeParticles[i];
+                sp.mesh.position.addScaledVector(sp.vel, delta);
+                sp.mesh.scale.addScalar(delta * 2.8);
+                sp.opacity -= delta * 1.4;
+                sp.mesh.material.opacity = Math.max(0, sp.opacity);
+
+                if (sp.opacity <= 0) {
+                    scene.remove(sp.mesh);
+                    sp.mesh.material.dispose();
+                    smokeParticles.splice(i, 1);
+                }
+            }
+        }
+
+        const hitRings = [];
+        const ringGeo = new THREE.RingGeometry(0.2, 0.6, 16);
+
+        function spawnHitRing(pos) {
+            const mat = new THREE.MeshBasicMaterial({ color: 0xff1111, side: THREE.DoubleSide, transparent: true, opacity: 1.0 });
+            const ring = new THREE.Mesh(ringGeo, mat);
+            ring.position.copy(pos);
+            ring.lookAt(camera.position);
+            scene.add(ring);
+            hitRings.push({ mesh: ring, opacity: 1.0, scale: 1.0 });
+        }
+
+        function updateHitRings(delta) {
+            for (let i = hitRings.length - 1; i >= 0; i--) {
+                const hr = hitRings[i];
+                hr.scale += delta * 5.0;
+                hr.mesh.scale.set(hr.scale, hr.scale, hr.scale);
+                hr.opacity -= delta * 4.5;
+                hr.mesh.material.opacity = Math.max(0, hr.opacity);
+                hr.mesh.lookAt(camera.position);
+
+                if (hr.opacity <= 0) {
+                    scene.remove(hr.mesh);
+                    hr.mesh.material.dispose();
+                    hitRings.splice(i, 1);
+                }
+            }
+        }
+
         // Input & Camera Controls
         let yaw = 0, pitch = 0;
         const input = { forward: 0, right: 0 };
@@ -468,7 +543,7 @@
         });
         window.addEventListener('keyup', e => keys[e.code] = false);
 
-        // PeerJS Network & Shared State Engine
+        // Network Integration
         function initPeer(customId = null) {
             peer = customId ? new Peer(customId) : new Peer();
             peer.on('connection', (c) => {
@@ -530,15 +605,10 @@
                     }
                 } else if (data.type === 'HIT_ZULU') {
                     if (isHost) {
-                        damageZulu(data.zuluId, data.damage);
+                        damageZulu(data.zuluId, data.damage, data.hitPos ? new THREE.Vector3(data.hitPos.x, data.hitPos.y, data.hitPos.z) : null);
                     }
-                } else if (data.type === 'DAMAGE_CLIENT') {
-                    // Client damaged by Host Zulu calculation
-                    if (!isHost && !STATE.isDead) {
-                        STATE.hp -= data.damage;
-                        document.getElementById('hp-val').innerText = Math.max(0, Math.ceil(STATE.hp));
-                        if (STATE.hp <= 0) handlePlayerDeath();
-                    }
+                } else if (data.type === 'SMOKE_FX') {
+                    spawnGunSmoke(new THREE.Vector3(data.x, data.y, data.z), new THREE.Vector3(data.dx, data.dy, data.dz));
                 }
             });
         }
@@ -573,7 +643,7 @@
             if (isHost || !conn) startWave(1);
         }
 
-        // Shared Enemy Management Logic
+        // Shared Enemy Management
         const zulus = [];
         const zuluMat = new THREE.MeshStandardMaterial({ color: 0x6e3b23, roughness: 0.85 });
 
@@ -676,13 +746,16 @@
             setTimeout(() => { ind.style.opacity = '0'; }, 90);
         }
 
-        function damageZulu(zuluId, damageAmount) {
+        function damageZulu(zuluId, damageAmount, hitPoint = null) {
             const idx = zulus.findIndex(z => z.id === zuluId);
             if (idx === -1) return;
 
             const z = zulus[idx];
             z.hp -= damageAmount;
+            
             showHitFeedback();
+            if (hitPoint) spawnHitRing(hitPoint);
+            else spawnHitRing(z.group.position.clone().add(new THREE.Vector3(0, 1.2, 0)));
 
             if (z.hp <= 0) {
                 scene.remove(z.group);
@@ -702,6 +775,8 @@
             const now = performance.now();
             if (STATE.gameOver || !STATE.gameStarted || STATE.settingsOpen || STATE.isDead) return;
 
+            const dir = camera.getWorldDirection(new THREE.Vector3());
+
             if (STATE.weapon === 'musket') {
                 if (STATE.reloading) return;
                 STATE.reloading = true;
@@ -711,17 +786,28 @@
                 weaponNode.position.z += 0.25;
                 weaponNode.rotation.x += 0.25;
 
-                const dir = camera.getWorldDirection(new THREE.Vector3());
+                // Fire Gun Smoke Particle Effect
+                const barrelWorldPos = new THREE.Vector3();
+                barrel.getWorldPosition(barrelWorldPos);
+                spawnGunSmoke(barrelWorldPos, dir);
+
+                if (conn && conn.open) {
+                    conn.send({ type: 'SMOKE_FX', x: barrelWorldPos.x, y: barrelWorldPos.y, z: barrelWorldPos.z, dx: dir.x, dy: dir.y, dz: dir.z });
+                }
+
                 const raycaster = new THREE.Raycaster(camera.getWorldPosition(new THREE.Vector3()), dir);
                 const hits = raycaster.intersectObjects(zulus.map(z => z.hitTarget));
                 
                 if (hits.length > 0) {
                     const hitZulu = zulus.find(z => z.hitTarget === hits[0].object);
                     if (hitZulu) {
+                        showHitFeedback();
+                        spawnHitRing(hits[0].point);
+
                         if (isHost || !conn) {
-                            damageZulu(hitZulu.id, CONFIG.musketDamage);
+                            damageZulu(hitZulu.id, CONFIG.musketDamage, hits[0].point);
                         } else {
-                            conn.send({ type: 'HIT_ZULU', zuluId: hitZulu.id, damage: CONFIG.musketDamage });
+                            conn.send({ type: 'HIT_ZULU', zuluId: hitZulu.id, damage: CONFIG.musketDamage, hitPos: hits[0].point });
                         }
                     }
                 }
@@ -731,16 +817,18 @@
                 swordGroup.rotation.z = -Math.PI / 1.5;
 
                 const camPos = camera.getWorldPosition(new THREE.Vector3());
-                const dir = camera.getWorldDirection(new THREE.Vector3());
 
                 for (let i = zulus.length - 1; i >= 0; i--) {
                     const zPos = zulus[i].group.position.clone().add(new THREE.Vector3(0, 1.2, 0));
                     if (camPos.distanceTo(zPos) < CONFIG.swordRange) {
                         if (dir.dot(zPos.sub(camPos).normalize()) > 0.15) {
+                            showHitFeedback();
+                            spawnHitRing(zPos);
+
                             if (isHost || !conn) {
-                                damageZulu(zulus[i].id, CONFIG.swordDamage);
+                                damageZulu(zulus[i].id, CONFIG.swordDamage, zPos);
                             } else {
-                                conn.send({ type: 'HIT_ZULU', zuluId: zulus[i].id, damage: CONFIG.swordDamage });
+                                conn.send({ type: 'HIT_ZULU', zuluId: zulus[i].id, damage: CONFIG.swordDamage, hitPos: zPos });
                             }
                             break;
                         }
@@ -765,6 +853,9 @@
             const delta = clock.getDelta();
             const time = clock.getElapsedTime();
 
+            updateGunSmoke(delta);
+            updateHitRings(delta);
+
             if (STATE.gameStarted && !STATE.gameOver) {
                 if (!STATE.isDead) {
                     player.rotation.y = yaw;
@@ -779,6 +870,17 @@
                         const nextPos = player.position.clone().addScaledVector(moveDir, 0.1);
                         if (!checkMountainCollision(nextPos)) player.position.copy(nextPos);
                     }
+
+                    // Direct Local Collision Damage Check (Host & Connected Client)
+                    zulus.forEach(z => {
+                        const dx = player.position.x - z.group.position.x;
+                        const dz = player.position.z - z.group.position.z;
+                        if (dx * dx + dz * dz < 2.25) { // Within 1.5 units melee range
+                            STATE.hp -= CONFIG.zuluDamage * delta;
+                            document.getElementById('hp-val').innerText = Math.max(0, Math.ceil(STATE.hp));
+                            if (STATE.hp <= 0) handlePlayerDeath();
+                        }
+                    });
                 }
 
                 if (STATE.reloading) {
@@ -795,7 +897,7 @@
                 weaponNode.rotation.x += (0 - weaponNode.rotation.x) * 0.12;
                 if (STATE.weapon === 'sword') swordGroup.rotation.z += (0 - swordGroup.rotation.z) * 0.15;
 
-                // Host Spawning & Movement AI
+                // Host Spawning & Smart Target AI
                 if ((isHost || !conn) && STATE.waveActive && STATE.zulusToSpawnInWave > 0 && performance.now() - lastSpawn > CONFIG.baseSpawnInterval) {
                     createZulu();
                     STATE.zulusToSpawnInWave--;
@@ -805,34 +907,25 @@
                 if (isHost || !conn) {
                     zulus.forEach((z) => {
                         let targetPos = player.position;
-                        let isTargetingClient = false;
+                        let minDist = Infinity;
 
-                        if (conn && conn.open) {
-                            if (STATE.isDead && !STATE.remoteIsDead) {
-                                targetPos = remotePlayerMesh.position;
-                                isTargetingClient = true;
-                            } else if (!STATE.isDead && !STATE.remoteIsDead) {
-                                if (z.id % 2 === 0) {
-                                    targetPos = remotePlayerMesh.position;
-                                    isTargetingClient = true;
-                                }
-                            }
+                        // Target nearest living defender
+                        if (!STATE.isDead) {
+                            const dHost = z.group.position.distanceTo(player.position);
+                            if (dHost < minDist) { minDist = dHost; targetPos = player.position; }
+                        }
+
+                        if (conn && conn.open && !STATE.remoteIsDead) {
+                            const dRemote = z.group.position.distanceTo(remotePlayerMesh.position);
+                            if (dRemote < minDist) { minDist = dRemote; targetPos = remotePlayerMesh.position; }
                         }
 
                         const dir = targetPos.clone().sub(z.group.position); dir.y = 0;
-                        if (dir.length() > 1.4) {
-                            dir.normalize(); z.group.position.addScaledVector(dir, CONFIG.baseSpeed);
+                        if (dir.length() > 1.2) {
+                            dir.normalize();
+                            z.group.position.addScaledVector(dir, CONFIG.baseSpeed);
                             z.group.lookAt(z.group.position.x + dir.x, z.group.position.y, z.group.position.z + dir.z);
                             z.group.rotation.z = Math.sin(time * 12 + z.animOffset) * 0.08;
-                        } else {
-                            const damageDealt = CONFIG.zuluDamage * delta;
-                            if (isTargetingClient && conn && conn.open) {
-                                conn.send({ type: 'DAMAGE_CLIENT', damage: damageDealt });
-                            } else if (!STATE.isDead) {
-                                STATE.hp -= damageDealt;
-                                document.getElementById('hp-val').innerText = Math.max(0, Math.ceil(STATE.hp));
-                                if (STATE.hp <= 0) handlePlayerDeath();
-                            }
                         }
                     });
                 }
