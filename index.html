@@ -12,7 +12,7 @@ html,body{width:100%;height:100%;overflow:hidden;touch-action:none;background:#0
 #top-hud{display:grid;grid-template-columns:minmax(150px,1fr) auto minmax(150px,1fr);align-items:start;gap:14px}
 .hud-panel{min-width:0;padding:11px 14px;background:rgba(7,16,24,.78);border:1px solid rgba(143,196,209,.28);border-radius:13px;color:#eee8d8;font-size:11px;font-weight:700;letter-spacing:.05em;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);box-shadow:0 10px 35px rgba(0,0,0,.25),inset 0 1px rgba(255,255,255,.04);pointer-events:auto}.hud-panel:first-child{border-left:3px solid #4d91a8}.hud-panel:last-child{border-right:3px solid #4d91a8}
 #hud-center{display:flex;flex-direction:column;align-items:center;gap:7px}.version-badge{padding:4px 9px;background:rgba(7,16,24,.8);border:1px solid rgba(143,196,209,.28);border-radius:999px;color:#bdb8a9;font-size:9px;letter-spacing:.1em}.icon-btn{padding:8px 13px;background:rgba(7,16,24,.82);border:1px solid rgba(143,196,209,.28);border-radius:999px;color:#eee8d8;font-size:10px;font-weight:800;cursor:pointer;pointer-events:auto}.icon-btn:hover{background:#173746;border-color:#4d91a8}#room-code-badge{padding:5px 9px;background:rgba(7,16,24,.88);border:1px solid rgba(143,196,209,.28);border-radius:999px;color:#8fc4d1;font-size:9px;letter-spacing:.08em}
-#crosshair{position:absolute;top:50%;left:50%;width:18px;height:18px;transform:translate(-50%,-50%);pointer-events:none;z-index:5;display:none}#crosshair:before,#crosshair:after{content:"";position:absolute;background:rgba(238,232,216,.88);border-radius:2px}#crosshair:before{width:14px;height:2px;top:8px;left:2px}#crosshair:after{width:2px;height:14px;top:2px;left:8px}
+#crosshair{position:absolute;top:50%;left:50%;width:46px;height:46px;transform:translate(-50%,-50%);pointer-events:none;z-index:5;display:none;--gap:7px}.ch-line{position:absolute;display:block;background:rgba(238,232,216,.92);box-shadow:0 1px 3px rgba(0,0,0,.65);border-radius:1px}.ch-top,.ch-bottom{width:2px;height:9px;left:22px}.ch-left,.ch-right{width:9px;height:2px;top:22px}.ch-top{top:calc(0px - var(--gap))}.ch-bottom{bottom:calc(0px - var(--gap))}.ch-left{left:calc(0px - var(--gap))}.ch-right{right:calc(0px - var(--gap))}
 #controls-layer{position:absolute;inset:0;z-index:8;pointer-events:none;display:none}.touch-zone{position:absolute;pointer-events:auto}#touch-look{top:0;right:0;width:70%;height:75%}#joystick-bound{bottom:24px;left:24px;width:116px;height:116px;background:rgba(8,20,28,.48);border:1px solid rgba(143,196,209,.25);border-radius:50%;pointer-events:auto;position:absolute}#joystick-thumb{position:absolute;top:33px;left:33px;width:50px;height:50px;background:rgba(77,145,168,.75);border:1px solid rgba(238,232,216,.55);border-radius:50%;pointer-events:none}#action-buttons{position:absolute;bottom:24px;right:24px;display:flex;flex-direction:row-reverse;gap:10px;pointer-events:auto}.btn{width:68px;height:68px;border-radius:50%;background:rgba(8,20,28,.82);border:1px solid rgba(143,196,209,.4);color:#eee8d8;font-weight:900;font-size:10px;letter-spacing:.08em;display:flex;justify-content:center;align-items:center;box-shadow:0 8px 25px rgba(0,0,0,.35),inset 0 1px rgba(255,255,255,.05);cursor:pointer}.btn:active{transform:scale(.91)}#btn-attack{background:rgba(142,61,58,.85);border-color:rgba(199,91,85,.7)}#btn-switch{width:54px;height:54px;align-self:flex-end;background:rgba(35,76,88,.85)}#reload-bar-container{width:150px;height:6px;background:rgba(0,0,0,.5);border:1px solid rgba(143,196,209,.28);margin-top:6px;border-radius:5px;overflow:hidden;display:none}#reload-bar{width:0;height:100%;background:#4d91a8}
 #hit-indicator{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:42px;height:42px;border:2px solid #c75b55;border-radius:50%;pointer-events:none;opacity:0;z-index:6}#wave-banner{position:absolute;top:25%;left:50%;transform:translate(-50%,-50%);text-align:center;color:#eee8d8;z-index:15;pointer-events:none;opacity:0;transition:opacity .35s ease;text-shadow:0 4px 20px rgba(0,0,0,.7)}#wave-banner h2{font-size:clamp(2rem,5vw,3.5rem);font-weight:900;letter-spacing:.14em}#wave-banner p{font-size:11px;color:#bdb8a9;margin-top:7px;letter-spacing:.16em}
 .modal-screen{position:absolute;inset:0;z-index:25;display:flex;flex-direction:column;justify-content:center;align-items:center;color:#eee8d8;background:radial-gradient(circle at 50% 35%,rgba(62,111,126,.28),transparent 45%),rgba(4,11,17,.68);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);pointer-events:auto}.modal-box{width:min(390px,calc(100vw - 32px));padding:30px;background:linear-gradient(145deg,rgba(17,38,49,.96),rgba(7,17,25,.97));border:1px solid rgba(143,196,209,.28);border-radius:18px;text-align:center;box-shadow:0 30px 80px rgba(0,0,0,.55),inset 0 1px rgba(255,255,255,.04)}.modal-box h2{margin-bottom:7px;color:#eee8d8;font-size:25px;font-weight:900;letter-spacing:.13em}.modal-box h2:after{content:"";display:block;width:44px;height:2px;margin:12px auto 18px;background:#4d91a8;border-radius:2px}.setting-row{margin:18px 0;display:flex;flex-direction:column;gap:8px;color:#bdb8a9;font-size:10px;font-weight:700;letter-spacing:.08em}.toggle-group{display:flex;gap:6px}.toggle-btn{flex:1;padding:9px 12px;background:rgba(7,16,24,.75);color:#bdb8a9;border:1px solid rgba(143,196,209,.28);border-radius:9px;cursor:pointer}.toggle-btn.active{background:#4d91a8;color:#071018;border-color:#8fc4d1}.input-field{width:100%;padding:12px 14px;margin-bottom:10px;background:rgba(4,11,17,.72);color:#eee8d8;border:1px solid rgba(143,196,209,.28);border-radius:10px;outline:none;font-size:12px;font-weight:700;text-align:center}.input-field:focus{border-color:#4d91a8;background:rgba(10,28,38,.9)}.input-field::placeholder{color:#71838b}.close-btn{width:100%;margin-top:12px;padding:12px 18px;background:#4d91a8;color:#071018;border:0;border-radius:10px;font-weight:900;font-size:11px;letter-spacing:.08em;cursor:pointer}.hint-text{font-size:9px;color:#71838b;margin-top:6px}#game-over{display:none;background:radial-gradient(circle at center,rgba(100,30,30,.3),rgba(20,4,7,.92));z-index:20}#game-over h1{font-size:38px;color:#e47b74;margin-bottom:10px;text-shadow:0 4px 18px #000}#spectator-msg{position:absolute;top:18%;left:50%;transform:translateX(-50%);color:#e47b74;font-size:12px;font-weight:900;letter-spacing:.12em;text-shadow:0 3px 15px #000;display:none;z-index:12}@media(max-width:700px){#ui-layer{padding:10px}#top-hud{grid-template-columns:1fr 1fr}#hud-center{position:absolute;top:10px;left:50%;transform:translateX(-50%)}.hud-panel{font-size:9px;padding:9px 10px}.hint-text{display:none}.modal-box{padding:25px 20px}}
@@ -22,7 +22,7 @@ html,body{width:100%;height:100%;overflow:hidden;touch-action:none;background:#0
 </head>
 <body>
     <div id="canvas-container"></div>
-    <div id="crosshair"></div>
+    <div id="crosshair"><span class="ch-line ch-top"></span><span class="ch-line ch-right"></span><span class="ch-line ch-bottom"></span><span class="ch-line ch-left"></span></div>
     <div id="hit-indicator"></div>
     <div id="spectator-msg">YOU ARE DOWN - SPECTATING LOBBY</div>
 
@@ -865,7 +865,9 @@ html,body{width:100%;height:100%;overflow:hidden;touch-action:none;background:#0
 
         renderer.domElement.addEventListener('click', () => {
             if (STATE.gameStarted && !STATE.settingsOpen && !STATE.gameOver && !STATE.isDead) {
-                renderer.domElement.requestPointerLock();
+                if (document.pointerLockElement !== renderer.domElement) {
+                    renderer.domElement.requestPointerLock();
+                }
             }
         });
 
@@ -1174,14 +1176,43 @@ html,body{width:100%;height:100%;overflow:hidden;touch-action:none;background:#0
         }
 
         function switchWeapon() {
-            if (STATE.reloading || STATE.isDead) return;
+            if (STATE.isDead || STATE.gameOver || !STATE.gameStarted) return;
+
+            // Switching away from the musket instantly cancels and resets reload.
+            STATE.reloading = false;
+            STATE.lastAttackTime = 0;
+
+            const reloadContainer = document.getElementById('reload-bar-container');
+            const reloadBar = document.getElementById('reload-bar');
+            if (reloadContainer) reloadContainer.style.display = 'none';
+            if (reloadBar) reloadBar.style.width = '0%';
+
+            weaponNode.position.z = -0.5;
+            weaponNode.rotation.x = 0;
+
             STATE.weapon = STATE.weapon === 'musket' ? 'sword' : 'musket';
-            
-            // FP visual update
+
             musketGroup.visible = (STATE.weapon === 'musket');
             swordGroup.visible = (STATE.weapon === 'sword');
 
-            document.getElementById('weapon-val').innerText = (STATE.weapon === 'musket') ? 'MUSKET' : 'SWORD';
+            document.getElementById('weapon-val').innerText =
+                (STATE.weapon === 'musket') ? 'MUSKET' : 'SWORD';
+
+            if (STATE.weapon === 'musket') {
+                document.getElementById('ammo-val').innerText = 'READY';
+            }
+        }
+
+        function updateMusketCrosshair() {
+            const ch = document.getElementById('crosshair');
+            if (!ch) return;
+            if (STATE.weapon === 'musket') {
+                ch.style.display = 'block';
+                ch.style.setProperty('--gap', STATE.isMoving ? '12px' : '6px');
+            } else {
+                ch.style.display = 'block';
+                ch.style.setProperty('--gap', '3px');
+            }
         }
 
         function showHitFeedback() {
@@ -1293,10 +1324,17 @@ html,body{width:100%;height:100%;overflow:hidden;touch-action:none;background:#0
 
         document.getElementById('btn-attack').addEventListener('click', performAttack);
         document.getElementById('btn-switch').addEventListener('click', switchWeapon);
-        window.addEventListener('mousedown', (e) => { 
-            if (e.button === 0 && STATE.gameStarted && document.pointerLockElement === renderer.domElement) {
-                performAttack();
-            } 
+        updateMusketCrosshair();
+        window.addEventListener('mousedown', (e) => {
+            if (e.button !== 0) return;
+            if (!STATE.gameStarted || STATE.settingsOpen || STATE.gameOver || STATE.isDead) return;
+
+            // PC: left click always fires. If the mouse is not locked yet, lock it first.
+            if (document.pointerLockElement !== renderer.domElement) {
+                renderer.domElement.requestPointerLock();
+            }
+
+            performAttack();
         });
 
         let lastSpawn = 0;
@@ -1322,6 +1360,7 @@ html,body{width:100%;height:100%;overflow:hidden;touch-action:none;background:#0
                     
                     const moveDir = new THREE.Vector3(moveX, 0, -moveZ).normalize();
                     STATE.isMoving = (moveDir.lengthSq() > 0.01);
+                    updateMusketCrosshair();
 
                     if (STATE.isMoving) {
                         moveDir.applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
@@ -1356,6 +1395,9 @@ html,body{width:100%;height:100%;overflow:hidden;touch-action:none;background:#0
                     if (progress >= 1.0) {
                         STATE.reloading = false;
                         document.getElementById('reload-bar-container').style.display = 'none';
+                        document.getElementById('reload-bar').style.width = '0%';
+                        weaponNode.position.z = -0.5;
+                        weaponNode.rotation.x = 0;
                     }
                 }
 
