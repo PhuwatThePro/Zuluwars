@@ -30,7 +30,8 @@ html,body{
     position:absolute;
     inset:0;
     z-index:1;
-    display:none
+    display:none;
+    pointer-events:auto;
 }
 
 #ui-layer{
@@ -2105,12 +2106,6 @@ function createSoldierMesh(){
         tpMuzzle
     );
 
-    /*
-     * IMPORTANT:
-     * The weapon itself uses local +Y as barrel direction.
-     * updateCharacterPose() handles its final shoulder orientation.
-     */
-
     tpMusket.position.set(
         .30,
         1.27,
@@ -2279,10 +2274,6 @@ function updateCharacterPose(
         data.sword.visible =
             false;
 
-        /*
-         * SHOULDER-MOUNTED MUSKET POSE
-         */
-
         const rightHandTarget =
             new THREE.Vector3(
                 .30,
@@ -2335,13 +2326,6 @@ function updateCharacterPose(
             );
 
         }else{
-
-            /*
-             * READY POSITION:
-             *
-             * Right shoulder / chest,
-             * not from the belly.
-             */
 
             data.musket.position.set(
                 .30,
@@ -2470,10 +2454,6 @@ function updateCharacterPose(
                     time*11
                 ) * .012;
 
-            /*
-             * Keep bob centered around
-             * shoulder position.
-             */
             data.musket.position.y =
                 1.27 + bob;
         }
@@ -2994,26 +2974,11 @@ const keys={};
 
 /*
  * PC FIX:
- * Use pointerdown for fire/slash.
- * The first click locks the cursor AND attacks.
+ * Click directly locks pointer and performs attack when active.
  */
-renderer.domElement.addEventListener(
-    "pointerdown",
+document.addEventListener(
+    "click",
     e => {
-
-        if(
-            e.pointerType !==
-            "mouse"
-        ){
-            return;
-        }
-
-        if(
-            e.button !== 0
-        ){
-            return;
-        }
-
         if(
             !STATE.gameStarted ||
             STATE.settingsOpen ||
@@ -3023,30 +2988,19 @@ renderer.domElement.addEventListener(
             return;
         }
 
-        e.preventDefault();
-
         if(
             document.pointerLockElement !==
             renderer.domElement
         ){
-
             try{
-                const result =
-                    renderer.domElement.requestPointerLock();
-
-                if(
-                    result &&
-                    result.catch
-                ){
-                    result.catch(
-                        () => {}
-                    );
-                }
-
+                renderer.domElement.requestPointerLock();
             }catch(err){}
+            return;
         }
 
-        performAttack();
+        if(e.button === 0){
+            performAttack();
+        }
     }
 );
 
@@ -3534,9 +3488,6 @@ function setupNetwork(){
                 remotePlayerMesh.visible =
                     !STATE.remoteIsDead;
 
-                /*
-                 * REMOTE ATTACK SYNC
-                 */
                 if(
                     typeof data.attackSerial ===
                     "number"
@@ -3681,11 +3632,6 @@ function sendNetworkPacket(){
         equippedWeapon:
             STATE.weapon,
 
-        /*
-         * NEW:
-         * Tell other players what animation
-         * state we are in.
-         */
         reloading:
             STATE.reloading,
 
@@ -4627,9 +4573,6 @@ function performAttack(){
         STATE.lastAttackTime=
             now;
 
-        /*
-         * LOCAL SLASH
-         */
         const attackNow =
             performance.now();
 
@@ -4639,9 +4582,6 @@ function performAttack(){
         playerModel.userData.slashTime=
             attackNow;
 
-        /*
-         * NETWORK SLASH
-         */
         STATE.attackSerial++;
 
         const camPos =
@@ -4787,6 +4727,9 @@ function animate(){
             cameraNode.rotation.x=
                 pitch;
 
+            weaponNode.rotation.x=
+                pitch;
+
             let moveZ =
                 input.forward +
                 (
@@ -4869,11 +4812,6 @@ function animate(){
                 delta
             );
 
-            /*
-             * ZULU ATTACK LOGIC
-             *
-             * No backward push anymore.
-             */
             zulus.forEach(
                 z => {
 
@@ -4934,9 +4872,6 @@ function animate(){
             );
         }
 
-        /*
-         * REMOTE PLAYER ANIMATION
-         */
         if(
             remotePlayerMesh &&
             remotePlayerMesh.visible
@@ -4951,9 +4886,6 @@ function animate(){
             );
         }
 
-        /*
-         * MUSKET RELOAD
-         */
         if(
             STATE.reloading
         ){
@@ -5002,9 +4934,6 @@ function animate(){
             }
         }
 
-        /*
-         * FIRST PERSON SWORD ANIMATION
-         */
         if(
             STATE.weapon ===
             "sword"
@@ -5056,9 +4985,6 @@ function animate(){
             }
         }
 
-        /*
-         * ZULU SPAWNING
-         */
         if(
             (
                 isHost ||
@@ -5079,12 +5005,6 @@ function animate(){
                 performance.now();
         }
 
-        /*
-         * ZULU AI
-         *
-         * They approach the target and stop.
-         * They NEVER teleport backward.
-         */
         if(
             isHost ||
             !conn
