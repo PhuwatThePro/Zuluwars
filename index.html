@@ -1,1 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Zulu Wars</title>
+</head>
+<body>
+<script>
+(async()=>{
+  const RAW='https://raw.githubusercontent.com/PhuwatThePro/Zuluwars/refs/heads/main/old3index.html';
+  let source=await (await fetch(RAW,{cache:'no-store'})).text();
 
+  // Warband-style separated crosshair.
+  const crosshairCSS=`
+#crosshair{width:44px!important;height:44px!important;--spread:0px;transition:none!important}
+#crosshair:before,#crosshair:after{display:none!important}
+#crosshair .ch{position:absolute;display:block;background:rgba(238,232,216,.92);box-shadow:0 1px 3px rgba(0,0,0,.65);border-radius:1px}
+#crosshair .ch.top,#crosshair .ch.bottom{width:2px;height:10px;left:21px}
+#crosshair .ch.left,#crosshair .ch.right{width:10px;height:2px;top:21px}
+#crosshair .ch.top{top:calc(0px - var(--spread))}
+#crosshair .ch.bottom{bottom:calc(0px - var(--spread))}
+#crosshair .ch.left{left:calc(0px - var(--spread))}
+#crosshair .ch.right{right:calc(0px - var(--spread))}
+#crosshair .ch.center{width:3px;height:3px;left:20px;top:20px;border-radius:50%;opacity:.65}
+`;
+  source=source.replace('</style>',crosshairCSS+'</style>');
+
+  // Give the existing crosshair its four separated pieces.
+  source=source.replace('<div id="crosshair"></div>','<div id="crosshair"><i class="ch top"></i><i class="ch right"></i><i class="ch bottom"></i><i class="ch left"></i><i class="ch center"></i></div>');
+
+  // Make the musket deliberately inaccurate. Standing still = moderate spread;
+  // moving = considerably wider spread. Sword behavior is untouched.
+  const aimLine='const dir = camera.getWorldDirection(new THREE.Vector3());';
+  const aimReplacement=`const dir = camera.getWorldDirection(new THREE.Vector3());
+            if (STATE.weapon === 'musket') {
+                const moving = STATE.isMoving ? 1 : 0;
+                const spread = moving ? 0.075 : 0.032;
+                const yaw = (Math.random() - 0.5) * spread;
+                const pitch = (Math.random() - 0.5) * spread;
+                const right = new THREE.Vector3().crossVectors(dir, camera.up).normalize();
+                const up = new THREE.Vector3().crossVectors(right, dir).normalize();
+                dir.addScaledVector(right, yaw).addScaledVector(up, pitch).normalize();
+            }`;
+  source=source.replace(aimLine,aimReplacement);
+
+  // Dynamically expand the crosshair to communicate the current inaccuracy.
+  const spreadScript=`
+<script>
+(function(){
+  function updateMusketCrosshair(){
+    const ch=document.getElementById('crosshair');
+    if(!ch)return;
+    const moving=typeof STATE!=='undefined' && STATE.weapon==='musket' && STATE.isMoving;
+    const musket=typeof STATE!=='undefined' && STATE.weapon==='musket';
+    ch.style.setProperty('--spread',musket?(moving?'12px':'5px'):'0px');
+    ch.style.opacity=musket?'1':'.72';
+    requestAnimationFrame(updateMusketCrosshair);
+  }
+  requestAnimationFrame(updateMusketCrosshair);
+})();
+</script>`;
+  source=source.replace('</body>',spreadScript+'</body>');
+
+  // Replace this loader with the complete modified old3 source in the browser.
+  document.open();
+  document.write(source);
+  document.close();
+})().catch(err=>{
+  document.body.innerHTML='<pre style="color:white;background:#071018;padding:20px;white-space:pre-wrap">Zulu Wars failed to load: '+String(err)+'</pre>';
+});
+</script>
+</body>
+</html>
