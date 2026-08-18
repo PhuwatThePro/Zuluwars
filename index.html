@@ -6,9 +6,21 @@
     <title>1879 Frontier Defense - Mountain Pass v1.2.1</title>
     <style>
         * { box-sizing: border-box; user-select: none; -webkit-user-select: none; margin: 0; padding: 0; }
-        body, html { width: 100%; height: 100%; overflow: hidden; background-color: #000; font-family: 'Courier New', Courier, monospace; touch-action: none; }
-        #canvas-container { width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 1; }
-        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; pointer-events: none; display: flex; flex-direction: column; justify-content: space-between; padding: 15px; }
+        body, html { 
+            width: 100%; 
+            height: 100%; 
+            overflow: hidden; 
+            font-family: 'Courier New', Courier, monospace; 
+            touch-action: none; 
+            background-color: #1a1a1a;
+            /* Revamped Menu Background: British Regiment in Zulu Wars */
+            background-image: linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.8)), url('https://images.squarespace-cdn.com/content/v1/55ba62bbe4b0e98081681283/1495475851493-27O5C5C26685D275C266/image-asset.jpeg');
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+        }
+        #canvas-container { width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 1; display: none; }
+        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; pointer-events: none; display: none; flex-direction: column; justify-content: space-between; padding: 15px; }
         .hud-panel { background: rgba(20, 15, 10, 0.85); border: 2px solid #8b5a2b; color: #f0e6d2; padding: 10px 15px; border-radius: 4px; font-weight: bold; text-shadow: 1px 1px 2px #000; pointer-events: auto; }
         #top-hud { display: flex; justify-content: space-between; align-items: flex-start; }
         #hud-center { display: flex; flex-direction: column; align-items: center; gap: 6px; }
@@ -16,11 +28,11 @@
         .icon-btn { background: rgba(20, 15, 10, 0.85); border: 2px solid #d4af37; color: #f0e6d2; padding: 8px 12px; border-radius: 4px; font-weight: bold; cursor: pointer; pointer-events: auto; font-family: inherit; }
         .icon-btn:hover { background: #8b5a2b; }
         #room-code-badge { background: rgba(0, 0, 0, 0.85); border: 1px solid #d4af37; color: #d4af37; padding: 4px 8px; border-radius: 4px; font-size: 11px; display: none; }
-        #crosshair { position: absolute; top: 50%; left: 50%; width: 16px; height: 16px; transform: translate(-50%, -50%); pointer-events: none; z-index: 5; }
+        #crosshair { position: absolute; top: 50%; left: 50%; width: 16px; height: 16px; transform: translate(-50%, -50%); pointer-events: none; z-index: 5; display: none; }
         #crosshair::before, #crosshair::after { content: ''; position: absolute; background: rgba(255, 255, 255, 0.9); }
         #crosshair::before { top: 7px; left: 0; width: 16px; height: 2px; }
         #crosshair::after { top: 0; left: 7px; width: 2px; height: 16px; }
-        #controls-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 8; pointer-events: none; }
+        #controls-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 8; pointer-events: none; display: none; }
         .touch-zone { position: absolute; pointer-events: auto; }
         #touch-look { top: 0; right: 0; width: 70%; height: 75%; }
         #joystick-bound { bottom: 20px; left: 20px; width: 120px; height: 120px; background: rgba(255, 255, 255, 0.1); border: 2px solid rgba(255, 255, 255, 0.3); border-radius: 60px; pointer-events: auto; position: absolute; }
@@ -38,8 +50,8 @@
         #wave-banner h2 { font-size: 3.5rem; letter-spacing: 4px; }
         #wave-banner p { font-size: 1.2rem; color: #f0e6d2; margin-top: 5px; }
 
-        .modal-screen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.88); z-index: 25; display: flex; flex-direction: column; justify-content: center; align-items: center; color: #f0e6d2; pointer-events: auto; }
-        .modal-box { background: #2a1f18; border: 3px solid #8b5a2b; padding: 25px 35px; border-radius: 8px; width: 340px; text-align: center; box-shadow: 0 0 20px rgba(0,0,0,0.8); }
+        .modal-screen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 25; display: flex; flex-direction: column; justify-content: center; align-items: center; color: #f0e6d2; pointer-events: auto; }
+        .modal-box { background: rgba(42, 31, 24, 0.92); border: 3px solid #8b5a2b; padding: 25px 35px; border-radius: 8px; width: 340px; text-align: center; box-shadow: 0 0 20px rgba(0,0,0,0.8); }
         .modal-box h2 { color: #d4af37; margin-bottom: 5px; }
         .setting-row { margin: 15px 0; display: flex; justify-content: space-between; align-items: center; }
         .toggle-group { display: flex; gap: 5px; }
@@ -101,7 +113,7 @@
     <div id="lobby-modal" class="modal-screen">
         <div class="modal-box">
             <h2>FRONTIER DEFENSE</h2>
-            <div style="font-size: 13px; color: #d4af37; margin-bottom: 15px; font-weight: bold;">VERSION 1.2.1</div>
+            <div style="font-size: 13px; color: #d4af37; margin-bottom: 15px; font-weight: bold;">Multiplayer Only</div>
             <input type="text" id="player-name" class="input-field" placeholder="SOLDIER NAME" maxlength="12" value="Private">
             
             <button class="close-btn" style="background: #2b4a8b; margin-top: 0; margin-bottom: 12px;" onclick="createRoom()">CREATE ROOM (HOST)</button>
@@ -110,15 +122,14 @@
                 <input type="text" id="room-code-input" class="input-field" placeholder="4-DIGIT CODE" maxlength="4" style="margin-bottom:0; width:60%;">
                 <button class="toggle-btn" style="width:40%; background:#8b5a2b; color:#fff;" onclick="joinRoom()">JOIN</button>
             </div>
-
-            <button class="close-btn" style="background: #444;" onclick="startSingleplayer()">SINGLEPLAYER</button>
+            <!-- Singleplayer button removed as requested -->
         </div>
     </div>
 
     <!-- SETTINGS MODAL -->
     <div id="settings-modal" class="modal-screen" style="display: none;">
         <div class="modal-box">
-            <h2>SETTINGS <span style="font-size: 12px; color: #d4af37;">(v1.2.1)</span></h2>
+            <h2>SETTINGS</h2>
             <div class="setting-row">
                 <span>CAMERA VIEW</span>
                 <div class="toggle-group">
@@ -319,27 +330,28 @@
             scene.add(bag);
         }
 
-        // 3D Nametag with explicit Version Tag
-        function createNametagSprite(nameText, versionText = GAME_VERSION) {
+        // 3D Nametag (Version tag removed from bubble as requested)
+        function createNametagSprite(nameText) {
             const canvas = document.createElement('canvas');
-            canvas.width = 320; canvas.height = 70;
+            canvas.width = 256; canvas.height = 64;
             const ctx = canvas.getContext('2d');
             ctx.fillStyle = 'rgba(20, 15, 10, 0.85)';
             ctx.strokeStyle = '#d4af37';
             ctx.lineWidth = 4;
-            ctx.fillRect(4, 4, 312, 62);
-            ctx.strokeRect(4, 4, 312, 62);
+            ctx.fillRect(4, 4, 248, 56);
+            ctx.strokeRect(4, 4, 248, 56);
             
-            ctx.font = 'Bold 22px Courier New';
+            ctx.font = 'Bold 26px Courier New';
             ctx.fillStyle = '#f0e6d2';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.fillText(`${nameText} [${versionText}]`, 160, 35);
+            // Explicitly removed GAME_VERSION from here
+            ctx.fillText(nameText, 128, 32);
 
             const texture = new THREE.CanvasTexture(canvas);
             const spriteMat = new THREE.SpriteMaterial({ map: texture });
             const sprite = new THREE.Sprite(spriteMat);
-            sprite.scale.set(3.2, 0.7, 1);
+            sprite.scale.set(2.5, 0.625, 1);
             sprite.position.y = 2.4;
             return sprite;
         }
@@ -434,7 +446,6 @@
                 const mat = new THREE.MeshBasicMaterial({ color: 0xeeeeee, transparent: true, opacity: 0.85, depthWrite: false });
                 const mesh = new THREE.Mesh(smokeGeo, mat);
                 
-                // Direct forward projection along sightline vector
                 const spawnPt = originPos.clone().add(dirVector.clone().multiplyScalar(0.95));
                 spawnPt.x += (Math.random() - 0.5) * 0.35;
                 spawnPt.y += (Math.random() - 0.5) * 0.35;
@@ -634,6 +645,7 @@
                 document.getElementById('network-status').innerText = `ONLINE (${GAME_VERSION})`;
                 remotePlayerMesh.visible = true;
                 setInterval(sendNetworkPacket, 50);
+                // Handshake still sends version for compatibility checks, but createNametagSprite won't use it
                 conn.send({ type: 'HANDSHAKE', name: playerName, version: GAME_VERSION });
             });
 
@@ -641,7 +653,8 @@
                 if (data.type === 'HANDSHAKE') {
                     remotePlayerName = data.name;
                     if (nametagSprite) remotePlayerMesh.remove(nametagSprite);
-                    nametagSprite = createNametagSprite(remotePlayerName, data.version || GAME_VERSION);
+                    // createNametagSprite only takes name now
+                    nametagSprite = createNametagSprite(remotePlayerName);
                     remotePlayerMesh.add(nametagSprite);
                 } else if (data.type === 'SYNC') {
                     remotePlayerMesh.position.set(data.x, data.y, data.z);
@@ -681,13 +694,20 @@
             }
         }
 
-        function startSingleplayer() {
-            document.getElementById('network-status').innerText = `OFFLINE (${GAME_VERSION})`;
-            startGame();
-        }
+        // Removed startSingleplayer function as button was removed
 
         function startGame() {
+            // Hide menu background elements
             document.getElementById('lobby-modal').style.display = 'none';
+            document.body.style.backgroundImage = 'none';
+            document.body.style.backgroundColor = '#000'; // Black fallback for Three.js
+            
+            // Show game elements
+            document.getElementById('canvas-container').style.display = 'block';
+            document.getElementById('ui-layer').style.display = 'flex';
+            document.getElementById('controls-layer').style.display = 'block';
+            document.getElementById('crosshair').style.display = 'block';
+            
             STATE.gameStarted = true;
             if (isHost || !conn) startWave(1);
         }
@@ -898,13 +918,15 @@
 
         function animate() {
             requestAnimationFrame(animate);
+            if (!STATE.gameStarted) return; // Don't run Three.js loops if not started
+
             const delta = clock.getDelta();
             const time = clock.getElapsedTime();
 
             updateGunSmoke(delta);
             updateHitRings(delta);
 
-            if (STATE.gameStarted && !STATE.gameOver) {
+            if (!STATE.gameOver) {
                 if (!STATE.isDead) {
                     player.rotation.y = yaw;
                     cameraNode.rotation.x = pitch;
