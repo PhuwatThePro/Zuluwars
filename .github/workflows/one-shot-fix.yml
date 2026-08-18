@@ -1,0 +1,214 @@
+name: One-shot Zulu bugfix
+on:
+  push:
+    paths:
+      - '.github/workflows/one-shot-fix.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch standalone index.html
+        shell: python
+        run: |
+          from pathlib import Path
+          p=Path('index.html')
+          s=p.read_text(encoding='utf-8')
+
+          s=s.replace("            remoteWeapon: 'musket'\n", "            remoteWeapon: 'musket',\n            musketReloadUntil: 0\n", 1)
+
+          s=s.replace("            zuluDamage: 36,\n            swordDamage: 1\n", "            zuluDamage: 36,\n            swordDamage: 1,\n            zuluStopDistance: 3.2,\n            zuluAttackRange: 3.7,\n            zuluAttackCooldown: 1.0\n", 1)
+
+          old_switch="""        function switchWeapon() {
+            if (STATE.isDead || STATE.gameOver || !STATE.gameStarted) return;
+
+            // Switching away from the musket instantly cancels and resets reload.
+            STATE.reloading = false;
+            STATE.lastAttackTime = 0;
+
+            const reloadContainer = document.getElementById('reload-bar-container');
+            const reloadBar = document.getElementById('reload-bar');
+            if (reloadContainer) reloadContainer.style.display = 'none';
+            if (reloadBar) reloadBar.style.width = '0%';
+
+            weaponNode.position.z = -0.5;
+            weaponNode.rotation.x = 0;
+
+            STATE.weapon = STATE.weapon === 'musket' ? 'sword' : 'musket';
+
+            musketGroup.visible = (STATE.weapon === 'musket');
+            swordGroup.visible = (STATE.weapon === 'sword');
+
+            document.getElementById('weapon-val').innerText =
+                (STATE.weapon === 'musket') ? 'MUSKET' : 'SWORD';
+
+            if (STATE.weapon === 'musket') {
+                document.getElementById('ammo-val').innerText = 'READY';
+            }
+        }"""
+          new_switch="""        function switchWeapon() {
+            if (STATE.isDead || STATE.gameOver || !STATE.gameStarted) return;
+
+            const now = performance.now();
+            const wasMusket = STATE.weapon === 'musket';
+
+            // Switching away from the musket cancels only the visible reload animation.
+            // The actual reload completion time is preserved, so swapping cannot cheat
+            // the reload timer. Switching back to the musket resumes the remaining time.
+            STATE.reloading = false;
+
+            const reloadContainer = document.getElementById('reload-bar-container');
+            const reloadBar = document.getElementById('reload-bar');
+            if (reloadContainer) reloadContainer.style.display = 'none';
+            if (reloadBar) reloadBar.style.width = '0%';
+
+            weaponNode.position.z = -0.5;
+            weaponNode.rotation.x = 0;
+
+            STATE.weapon = wasMusket ? 'sword' : 'musket';
+
+            musketGroup.visible = (STATE.weapon === 'musket');
+            swordGroup.visible = (STATE.weapon === 'sword');
+
+            document.getElementById('weapon-val').innerText =
+                (STATE.weapon === 'musket') ? 'MUSKET' : 'SWORD';
+
+            if (STATE.weapon === 'musket') {
+                if (STATE.musketReloadUntil > now) {
+                    STATE.reloading = true;
+                    STATE.lastAttackTime = STATE.musketReloadUntil - CONFIG.musketCooldown;
+                    if (reloadContainer) reloadContainer.style.display = 'block';
+                    if (reloadBar) {
+                        const done = CONFIG.musketCooldown - (STATE.musketReloadUntil - now);
+                        reloadBar.style.width = `${Math.max(0, Math.min(done / CONFIG.musketCooldown, 1)) * 100}%`;
+                    }
+                    document.getElementById('ammo-val').innerText = 'RELOADING';
+                } else {
+                    STATE.musketReloadUntil = 0;
+                    document.getElementById('ammo-val').innerText = 'READY';
+                }
+            }
+        }"""
+          if old_switch not in s: raise SystemExit('switchWeapon block not found')
+          s=s.replace(old_switch,new_switch,1)
+
+          old_fire="""            if (STATE.weapon === 'musket') {
+                if (STATE.reloading) return;
+                STATE.reloading = true;
+                STATE.lastAttackTime = now;
+"""
+          new_fire="""            if (STATE.weapon === 'musket') {
+                if (STATE.reloading) return;
+                if (STATE.musketReloadUntil > now) return;
+                STATE.musketReloadUntil = now + CONFIG.musketCooldown;
+                STATE.reloading = true;
+                STATE.lastAttackTime = now;
+"""
+          if old_fire not in s: raise SystemExit('musket fire block not found')
+          s=s.replace(old_fire,new_fire,1)
+
+          old_zobj="""            const zObj = { id: zId, group: group, headHitbox: headHitbox, bodyHitbox: bodyHitbox, hp: 2, animOffset: Math.random() * 10 };
+"""
+          new_zobj="""            const zObj = { id: zId, group: group, headHitbox: headHitbox, bodyHitbox: bodyHitbox, hp: 2, animOffset: Math.random() * 10, attackTimer: 0 };
+"""
+          if old_zobj not in s: raise SystemExit('zulu object block not found')
+          s=s.replace(old_zobj,new_zobj,1)
+
+          old_damage="""                    zulus.forEach(z => {
+                        const dx = player.position.x - z.group.position.x;
+                        const dz = player.position.z - z.group.position.z;
+                        if (dx * dx + dz * dz < 2.25) {
+                            STATE.hp -= CONFIG.zuluDamage * delta;
+                            document.getElementById('hp-val').innerText = Math.max(0, Math.ceil(STATE.hp));
+                            if (STATE.hp <= 0) handlePlayerDeath();
+                        }
+                    });
+"""
+          new_damage="""                    zulus.forEach(z => {
+                        z.attackTimer = Math.max(0, (z.attackTimer || 0) - delta);
+                        const dx = player.position.x - z.group.position.x;
+                        const dz = player.position.z - z.group.position.z;
+                        const distSq = dx * dx + dz * dz;
+                        if (distSq < CONFIG.zuluAttackRange * CONFIG.zuluAttackRange && z.attackTimer <= 0) {
+                            STATE.hp -= CONFIG.zuluDamage;
+                            z.attackTimer = CONFIG.zuluAttackCooldown;
+                            document.getElementById('hp-val').innerText = Math.max(0, Math.ceil(STATE.hp));
+                            if (STATE.hp <= 0) handlePlayerDeath();
+                        }
+                    });
+"""
+          if old_damage not in s: raise SystemExit('player damage block not found')
+          s=s.replace(old_damage,new_damage,1)
+
+          s=s.replace("if (!blockedByBarricade && dir.length() > 1.2) {", "if (!blockedByBarricade && dir.length() > CONFIG.zuluStopDistance) {", 1)
+
+          old_reset="""            STATE.hp = 100; STATE.score = 0; STATE.gameOver = false; STATE.isDead = false; STATE.reloading = false;
+"""
+          new_reset="""            STATE.hp = 100; STATE.score = 0; STATE.gameOver = false; STATE.isDead = false; STATE.reloading = false; STATE.musketReloadUntil = 0;
+            document.getElementById('reload-bar-container').style.display = 'none';
+            document.getElementById('reload-bar').style.width = '0%';
+"""
+          if old_reset not in s: raise SystemExit('resetGame state block not found')
+          s=s.replace(old_reset,new_reset,1)
+
+          old_reload="""                    if (progress >= 1.0) {
+                        STATE.reloading = false;
+                        document.getElementById('reload-bar-container').style.display = 'none';
+                        document.getElementById('reload-bar').style.width = '0%';
+                        weaponNode.position.z = -0.5;
+                        weaponNode.rotation.x = 0;
+                    }
+"""
+          new_reload="""                    if (performance.now() >= STATE.musketReloadUntil) {
+                        STATE.reloading = false;
+                        STATE.musketReloadUntil = 0;
+                        document.getElementById('reload-bar-container').style.display = 'none';
+                        document.getElementById('reload-bar').style.width = '0%';
+                        document.getElementById('ammo-val').innerText = 'READY';
+                        weaponNode.position.z = -0.5;
+                        weaponNode.rotation.x = 0;
+                    }
+"""
+          if old_reload not in s: raise SystemExit('reload completion block not found')
+          s=s.replace(old_reload,new_reload,1)
+
+          # Keep Zulu from clipping into the camera/player. If a network/update ever puts
+          # one inside the stop radius, gently push it back toward its target-facing side.
+          old_ai="""                        if (!blockedByBarricade && dir.length() > CONFIG.zuluStopDistance) {
+                            dir.normalize();
+                            z.group.position.addScaledVector(dir, CONFIG.baseSpeed);
+                            z.group.lookAt(z.group.position.x + dir.x, z.group.position.y, z.group.position.z + dir.z);
+                            z.group.rotation.z = Math.sin(time * 12 + z.animOffset) * 0.08;
+                        }
+"""
+          new_ai="""                        const distToTarget = dir.length();
+                        if (!blockedByBarricade && distToTarget > CONFIG.zuluStopDistance) {
+                            dir.normalize();
+                            z.group.position.addScaledVector(dir, CONFIG.baseSpeed);
+                            z.group.lookAt(z.group.position.x + dir.x, z.group.position.y, z.group.position.z + dir.z);
+                            z.group.rotation.z = Math.sin(time * 12 + z.animOffset) * 0.08;
+                        } else if (!blockedByBarricade && distToTarget > 0 && distToTarget < CONFIG.zuluStopDistance - 0.2) {
+                            // Prevent enemy/camera overlap if a Zulu ever gets too close.
+                            dir.normalize();
+                            z.group.position.addScaledVector(dir, -0.05);
+                        }
+"""
+          if old_ai not in s: raise SystemExit('Zulu AI block not found')
+          s=s.replace(old_ai,new_ai,1)
+
+          p.write_text(s,encoding='utf-8')
+          print('Zulu fixes applied')
+      - name: Commit and remove one-shot workflow
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add index.html
+          git rm -f pc_controls.js || true
+          git add -u .github/workflows/one-shot-fix.yml
+          git commit -m 'Fix musket reload exploit and Zulu proximity combat'
+          git rm -f .github/workflows/one-shot-fix.yml
+          git commit -m 'Remove temporary one-shot fix workflow'
+          git push
