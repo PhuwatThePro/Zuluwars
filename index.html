@@ -104,6 +104,21 @@ html,body{width:100%;height:100%;overflow:hidden;touch-action:none;background:#0
     </div>
 
     <script>
+        window.addEventListener('error', function(e) {
+            console.error('Zulu Wars runtime error:', e.error || e.message);
+            let box = document.getElementById('zulu-runtime-error');
+            if (!box) {
+                box = document.createElement('div');
+                box.id = 'zulu-runtime-error';
+                box.style.cssText =
+                    'position:fixed;left:12px;right:12px;bottom:12px;z-index:99999;' +
+                    'padding:12px;background:rgba(45,12,15,.95);border:1px solid #c75b55;' +
+                    'border-radius:10px;color:#eee8d8;font:11px monospace;white-space:pre-wrap;';
+                document.body.appendChild(box);
+            }
+            box.textContent = 'GAME ERROR: ' + (e.error?.stack || e.message || 'Unknown error');
+        });
+
         const GAME_VERSION = "ZULU WARS";
 
         const STATE = {
@@ -158,6 +173,7 @@ html,body{width:100%;height:100%;overflow:hidden;touch-action:none;background:#0
         renderer.shadowMap.enabled = true;
         renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         container.appendChild(renderer.domElement);
+        container.style.display = 'block';
 
         window.addEventListener('resize', () => {
             camera.aspect = window.innerWidth / window.innerHeight;
@@ -803,7 +819,7 @@ html,body{width:100%;height:100%;overflow:hidden;touch-action:none;background:#0
         function startGame() {
             document.getElementById('lobby-modal').style.display = 'none';
             document.body.style.backgroundImage = 'none';
-            document.body.style.backgroundColor = '#000';
+            document.body.style.backgroundColor = '#071018';
             
             document.getElementById('canvas-container').style.display = 'block';
             document.getElementById('ui-layer').style.display = 'flex';
