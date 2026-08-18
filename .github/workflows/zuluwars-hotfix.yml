@@ -1,0 +1,162 @@
+name: Zulu Wars hotfix
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  apply-fixes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Apply gameplay fixes
+        shell: bash
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+
+          path = Path('index.html')
+          s = path.read_text(encoding='utf-8')
+
+          old = '#hit-indicator{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:42px;height:42px;border:2px solid #c75b55;border-radius:50%;pointer-events:none;opacity:0;z-index:6}'
+          new = old + '#damage-flash{position:absolute;inset:0;z-index:7;pointer-events:none;opacity:0;background:radial-gradient(circle,rgba(255,70,55,.08),rgba(210,20,20,.42));box-shadow:inset 0 0 90px rgba(210,20,20,.75);transition:opacity .08s ease}'
+          if old not in s:
+              raise SystemExit('damage CSS anchor not found')
+          s = s.replace(old, new, 1)
+
+          old = '<div id="hit-indicator"></div>'
+          new = old + '\n    <div id="damage-flash" aria-hidden="true"></div>'
+          if old not in s:
+              raise SystemExit('damage HTML anchor not found')
+          s = s.replace(old, new, 1)
+
+          old = '''                        if (dist < CONFIG.zuluStopDistance) {
+                            // Keep the enemy outside the player's body/camera space.
+                            const safeDist = CONFIG.zuluStopDistance;
+                            const inv = dist > 0.001 ? 1 / dist : 1;
+                            z.group.position.x = player.position.x - dx * inv * safeDist;
+                            z.group.position.z = player.position.z - dz * inv * safeDist;
+                        }
+
+'''
+          if old not in s:
+              raise SystemExit('Zulu teleport-back block not found')
+          s = s.replace(old, '', 1)
+
+          old = '''                            STATE.hp -= CONFIG.zuluDamage;
+                            z.attackTimer = CONFIG.zuluAttackCooldown;
+                            document.getElementById('hp-val').innerText = Math.max(0, Math.ceil(STATE.hp));'''
+          new = '''                            STATE.hp -= CONFIG.zuluDamage;
+                            z.attackTimer = CONFIG.zuluAttackCooldown;
+                            showDamageFlash();
+                            document.getElementById('hp-val').innerText = Math.max(0, Math.ceil(STATE.hp));'''
+          if old not in s:
+              raise SystemExit('damage logic anchor not found')
+          s = s.replace(old, new, 1)
+
+          old = '''                    // Loaded/ready: keep the musket forward in the soldier's
+                    // facing direction, with both hands seated on the stock.
+                    data.musket.position.set(0.04, 0.96, -0.28);
+                    data.musket.rotation.set(0, 0, -0.43);'''
+          new = '''                    // Loaded/ready: the musket's local +Y barrel axis is rotated
+                    // into the soldier's -Z facing direction, so it points at the enemy
+                    // instead of tilting upward into the sky.
+                    data.musket.position.set(0.04, 1.00, -0.20);
+                    data.musket.rotation.set(-Math.PI / 2, 0, 0);'''
+          if old not in s:
+              raise SystemExit('ready musket pose anchor not found')
+          s = s.replace(old, new, 1)
+
+          old = '''            pModel.userData = {
+                musket: tpMusket,
+                sword: tpSword,'''
+          new = '''            pModel.userData = {
+                musket: tpMusket,
+                sword: tpSword,
+                slashTime: 0,'''
+          if old not in s:
+              raise SystemExit('player model userdata anchor not found')
+          s = s.replace(old, new, 1)
+
+          old = '''                // Right hand forward with the sword, left arm relaxed.
+                const swordHandTarget = new THREE.Vector3(
+                    0.42, 1.00, -0.35
+                );
+
+                pointArmAt(rArm, swordHandTarget);
+
+                lArm.rotation.set(0, 0, 0.12);'''
+          new = '''                // Right hand forward with the sword, left arm relaxed.
+                const slashAge = performance.now() - (data.slashTime || 0);
+                const slashing = slashAge >= 0 && slashAge < 360;
+                const slashT = slashing ? slashAge / 360 : 1;
+                const slashCurve = slashing ? Math.sin(slashT * Math.PI) : 0;
+                const swordHandTarget = new THREE.Vector3(
+                    slashing ? 0.62 : 0.42,
+                    slashing ? 1.18 : 1.00,
+                    slashing ? -0.48 : -0.35
+                );
+
+                pointArmAt(rArm, swordHandTarget);
+
+                lArm.rotation.set(0, 0, 0.12);
+                data.sword.position.set(0.38, 0.74, -0.02);
+                if (slashing) {
+                    // Wide third-person diagonal slash, visible on the character model.
+                    data.sword.rotation.set(
+                        0.12 + slashCurve * 0.35,
+                        -0.18 + slashCurve * 0.22,
+                        1.05 - slashCurve * 2.35
+                    );
+                } else {
+                    data.sword.rotation.set(0.12, -0.18, 0.10);
+                }'''
+          if old not in s:
+              raise SystemExit('sword pose anchor not found')
+          s = s.replace(old, new, 1)
+
+          old = '''                // Visible slash; movement is not blocked while attacking.
+                swordGroup.userData.slashTime = now;
+                swordGroup.rotation.z = -Math.PI / 1.5;'''
+          new = '''                // Visible first-person slash and synced third-person animation.
+                swordGroup.userData.slashTime = now;
+                playerModel.userData.slashTime = now;
+                swordGroup.rotation.z = -Math.PI / 1.5;'''
+          if old not in s:
+              raise SystemExit('sword attack anchor not found')
+          s = s.replace(old, new, 1)
+
+          old = '''        function handlePlayerDeath() {'''
+          new = '''        function showDamageFlash() {
+            const flash = document.getElementById('damage-flash');
+            if (!flash) return;
+            flash.style.opacity = '1';
+            clearTimeout(showDamageFlash._timer);
+            showDamageFlash._timer = setTimeout(() => {
+                flash.style.opacity = '0';
+            }, 180);
+        }
+
+        function handlePlayerDeath() {'''
+          if old not in s:
+              raise SystemExit('death function anchor not found')
+          s = s.replace(old, new, 1)
+
+          path.write_text(s, encoding='utf-8')
+          PY
+
+      - name: Commit fixed game and remove one-shot workflow
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/zuluwars-hotfix.yml
+          git add index.html
+          git commit -m "Fix Zulu movement, musket aim, sword slash and damage feedback"
+          git push origin HEAD:main
