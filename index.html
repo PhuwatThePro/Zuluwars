@@ -171,12 +171,12 @@
         };
 
         const CONFIG = {
-            musketCooldown: 1800,
+            musketCooldown: 2700, // 1.5x reload time (1800 * 1.5)
             swordCooldown: 800,
             swordRange: 5.5,
-            baseSpeed: 0.08,
+            baseSpeed: 0.10, // Matching player speed (0.10)
             baseSpawnInterval: 2200,
-            zuluDamage: 18,
+            zuluDamage: 36,   // 2x attack damage (18 * 2)
             swordDamage: 1
         };
 
@@ -315,15 +315,41 @@
             return false;
         }
 
-        // Barricade
+        // Dynamic Barricade System with Respawning & Destruction Timers
+        const barricades = [];
         const bagMat = new THREE.MeshStandardMaterial({ color: 0xb5a075, roughness: 0.9 });
-        for (let i = -6; i <= 6; i++) {
-            const angle = (i / 12) * Math.PI * 0.7;
-            const bag = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.8, 0.8), bagMat);
-            bag.position.set(Math.sin(angle) * 7.5, 0.4, -Math.cos(angle) * 7.5);
-            bag.rotation.y = angle;
-            bag.castShadow = true; bag.receiveShadow = true;
-            scene.add(bag);
+
+        function initBarricades() {
+            barricades.forEach(b => scene.remove(b.mesh));
+            barricades.length = 0;
+
+            for (let i = -6; i <= 6; i++) {
+                const angle = (i / 12) * Math.PI * 0.7;
+                const bag = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.8, 0.8), bagMat);
+                const posX = Math.sin(angle) * 7.5;
+                const posZ = -Math.cos(angle) * 7.5;
+                bag.position.set(posX, 0.4, posZ);
+                bag.rotation.y = angle;
+                bag.castShadow = true; bag.receiveShadow = true;
+                scene.add(bag);
+
+                barricades.push({
+                    mesh: bag,
+                    x: posX,
+                    z: posZ,
+                    active: true,
+                    touchTimer: 0
+                });
+            }
+        }
+        initBarricades();
+
+        function resetBarricades() {
+            barricades.forEach(b => {
+                b.active = true;
+                b.mesh.visible = true;
+                b.touchTimer = 0;
+            });
         }
 
         // 3D Nametag Sprite
@@ -658,6 +684,14 @@
                     if (!isHost && data.zulus) {
                         syncZulusFromHost(data.zulus);
                     }
+                    if (!isHost && data.barricades) {
+                        data.barricades.forEach((act, idx) => {
+                            if (barricades[idx]) {
+                                barricades[idx].active = act;
+                                barricades[idx].mesh.visible = act;
+                            }
+                        });
+                    }
                 } else if (data.type === 'HIT_ZULU') {
                     if (isHost) {
                         damageZulu(data.zuluId, data.damage, data.hitPos ? new THREE.Vector3(data.hitPos.x, data.hitPos.y, data.hitPos.z) : null);
@@ -681,6 +715,7 @@
 
                 if (isHost) {
                     packet.zulus = zulus.map(z => ({ id: z.id, x: z.group.position.x, z: z.group.position.z, hp: z.hp }));
+                    packet.barricades = barricades.map(b => b.active);
                 }
 
                 conn.send(packet);
@@ -701,7 +736,7 @@
             if (isHost || !conn) startWave(1);
         }
 
-        // Enemy Management & Precise Hitboxes
+        // Enemy Management & Hitboxes
         const zulus = [];
         const zuluMat = new THREE.MeshStandardMaterial({ color: 0x6e3b23, roughness: 0.85 });
 
@@ -795,6 +830,7 @@
             STATE.zulusToSpawnInWave = 4 + num * 4;
             STATE.zulusRemainingInWave = STATE.zulusToSpawnInWave;
             STATE.waveActive = false;
+            resetBarricades(); // Barricades respawn every wave
             document.getElementById('wave-val').innerText = STATE.wave;
             showWaveBanner(`WAVE ${num}`, `DEFEND THE PASS`);
             setTimeout(() => { STATE.waveActive = true; }, 2500);
@@ -861,7 +897,6 @@
                     conn.send({ type: 'SMOKE_FX', x: originCamPos.x, y: originCamPos.y, z: originCamPos.z, dx: dir.x, dy: dir.y, dz: dir.z });
                 }
 
-                // Gather head & body hitboxes
                 const hitboxes = [];
                 zulus.forEach(z => {
                     if (z.headHitbox) hitboxes.push(z.headHitbox);
@@ -878,7 +913,6 @@
                     const hitZulu = zulus.find(z => z.id === zuluId);
                     
                     if (hitZulu) {
-                        // Headshot = 2 damage (One Shot Kill), Bodyshot = 1 damage (Two Shot Kill)
                         const damage = (part === 'head') ? 2 : 1;
 
                         showHitFeedback();
@@ -953,7 +987,7 @@
                         if (!checkMountainCollision(nextPos)) player.position.copy(nextPos);
                     }
 
-                    // Direct Damage Detection
+                    // Direct Damage Detection (Now 2x damage rate)
                     zulus.forEach(z => {
                         const dx = player.position.x - z.group.position.x;
                         const dz = player.position.z - z.group.position.z;
@@ -1002,8 +1036,27 @@
                         }
 
                         const dir = targetPos.clone().sub(z.group.position); dir.y = 0;
-                        if (dir.length() > 1.2) {
+
+                        // Barricade Collision & 3-Second Break Timer Logic
+                        let blockedByBarricade = false;
+                        for (let b of barricades) {
+                            if (!b.active) continue;
+                            const dx = z.group.position.x - b.x;
+                            const dz = z.group.position.z - b.z;
+                            if (dx * dx + dz * dz < 1.44) {
+                                blockedByBarricade = true;
+                                b.touchTimer += delta;
+                                if (b.touchTimer >= 3.0) {
+                                    b.active = false;
+                                    b.mesh.visible = false;
+                                }
+                                break;
+                            }
+                        }
+
+                        if (!blockedByBarricade && dir.length() > 1.2) {
                             dir.normalize();
+                            // Move at player speed (0.10)
                             z.group.position.addScaledVector(dir, CONFIG.baseSpeed);
                             z.group.lookAt(z.group.position.x + dir.x, z.group.position.y, z.group.position.z + dir.z);
                             z.group.rotation.z = Math.sin(time * 12 + z.animOffset) * 0.08;
@@ -1060,6 +1113,7 @@
             document.getElementById('spectator-msg').style.display = 'none';
             document.getElementById('game-over').style.display = 'none';
 
+            resetBarricades();
             setCameraMode(STATE.cameraMode);
             if (isHost || !conn) startWave(1);
         }
