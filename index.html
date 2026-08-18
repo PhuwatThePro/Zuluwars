@@ -137,7 +137,7 @@ html,body{width:100%;height:100%;overflow:hidden;touch-action:none;background:#0
             baseSpawnInterval: 2200,
             zuluDamage: 36,
             swordDamage: 1,
-            zuluStopDistance: 3.2,
+            zuluStopDistance: 3.7,
             zuluAttackRange: 3.8,
             zuluAttackCooldown: 1.0
         };
@@ -712,8 +712,17 @@ html,body{width:100%;height:100%;overflow:hidden;touch-action:none;background:#0
                 rArm.rotation.z += 0.08;
                 lArm.rotation.z -= 0.06;
 
-                data.musket.position.set(0.02, 0.92, -0.33);
-                data.musket.rotation.set(0, 0, -0.43);
+                if (model === playerModel && STATE.reloading) {
+                    // Reloading: lower the musket so the animation clearly
+                    // differs from the ready/firing stance.
+                    data.musket.position.set(0.12, 0.78, -0.16);
+                    data.musket.rotation.set(0.18, 0, -0.72);
+                } else {
+                    // Loaded/ready: keep the musket forward in the soldier's
+                    // facing direction, with both hands seated on the stock.
+                    data.musket.position.set(0.04, 0.96, -0.28);
+                    data.musket.rotation.set(0, 0, -0.43);
+                }
 
             } else {
                 data.musket.visible = false;
@@ -773,10 +782,20 @@ html,body{width:100%;height:100%;overflow:hidden;touch-action:none;background:#0
         weaponNode.add(musketGroup);
 
         const swordGroup = new THREE.Group();
-        const swordBlade = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.9, 0.01), new THREE.MeshStandardMaterial({ color: 0xeeeeee, metalness: 0.95 }));
-        swordBlade.position.set(0, 0.45, 0);
-        swordGroup.add(swordBlade);
+        const swordMetal = new THREE.MeshStandardMaterial({ color: 0xe8edf0, metalness: 0.95, roughness: 0.18 });
+        const swordBlade = new THREE.Mesh(new THREE.BoxGeometry(0.065, 1.02, 0.025), swordMetal);
+        swordBlade.position.set(0, 0.53, 0);
+        const swordTip = new THREE.Mesh(new THREE.ConeGeometry(0.046, 0.16, 4), swordMetal);
+        swordTip.rotation.z = Math.PI; swordTip.position.set(0, 1.12, 0);
+        const swordGuard = new THREE.Mesh(new THREE.BoxGeometry(0.30, 0.055, 0.055), new THREE.MeshStandardMaterial({ color: 0xb08a3e, metalness: 0.8, roughness: 0.3 }));
+        swordGuard.position.y = 0.035;
+        const swordGrip = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.25, 8), new THREE.MeshStandardMaterial({ color: 0x3a2415, roughness: 0.85 }));
+        swordGrip.position.y = -0.105;
+        const swordPommel = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 6), new THREE.MeshStandardMaterial({ color: 0xb08a3e, metalness: 0.8, roughness: 0.3 }));
+        swordPommel.position.y = -0.25;
+        swordGroup.add(swordBlade, swordTip, swordGuard, swordGrip, swordPommel);
         swordGroup.rotation.x = -Math.PI / 3; swordGroup.position.set(0, -0.1, -0.2);
+        swordGroup.userData.slashTime = 0;
         swordGroup.visible = false;
         weaponNode.add(swordGroup);
 
@@ -1090,8 +1109,18 @@ html,body{width:100%;height:100%;overflow:hidden;touch-action:none;background:#0
             const shield = new THREE.Mesh(new THREE.BoxGeometry(0.6, 1.3, 0.05), new THREE.MeshStandardMaterial({ color: 0x8b6a45 }));
             shield.position.set(-0.4, 1.2, 0.3); group.add(shield);
 
-            const spearShaft = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 2.2), new THREE.MeshStandardMaterial({ color: 0x4a2e11 }));
-            spearShaft.rotation.x = Math.PI / 2; spearShaft.position.set(0.4, 1.2, 0.4); group.add(spearShaft);
+            const spearShaft = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 3.15, 8), new THREE.MeshStandardMaterial({ color: 0x4a2e11, roughness: 0.8 }));
+            spearShaft.rotation.x = Math.PI / 2;
+            spearShaft.position.set(0.4, 1.2, 0.78);
+            group.add(spearShaft);
+
+            const spearHead = new THREE.Mesh(
+                new THREE.ConeGeometry(0.085, 0.42, 6),
+                new THREE.MeshStandardMaterial({ color: 0xbfc5c9, metalness: 0.9, roughness: 0.22 })
+            );
+            spearHead.rotation.x = -Math.PI / 2;
+            spearHead.position.set(0.4, 1.2, 2.56);
+            group.add(spearHead);
 
             const zId = id !== null ? id : zuluIdCounter++;
 
@@ -1318,6 +1347,8 @@ html,body{width:100%;height:100%;overflow:hidden;touch-action:none;background:#0
             } else {
                 if (now - STATE.lastAttackTime < CONFIG.swordCooldown) return;
                 STATE.lastAttackTime = now;
+                // Visible slash; movement is not blocked while attacking.
+                swordGroup.userData.slashTime = now;
                 swordGroup.rotation.z = -Math.PI / 1.5;
 
                 const camPos = camera.getWorldPosition(new THREE.Vector3());
@@ -1446,7 +1477,17 @@ html,body{width:100%;height:100%;overflow:hidden;touch-action:none;background:#0
 
                 weaponNode.position.z += (-0.5 - weaponNode.position.z) * 0.12;
                 weaponNode.rotation.x += (0 - weaponNode.rotation.x) * 0.12;
-                if (STATE.weapon === 'sword') swordGroup.rotation.z += (0 - swordGroup.rotation.z) * 0.15;
+                if (STATE.weapon === 'sword') {
+                    const slashAge = performance.now() - (swordGroup.userData.slashTime || 0);
+                    if (slashAge < 280) {
+                        const t = slashAge / 280;
+                        swordGroup.rotation.z = -Math.PI / 1.5 + Math.sin(t * Math.PI) * 0.85;
+                        swordGroup.rotation.x = -Math.PI / 3 + Math.sin(t * Math.PI) * 0.25;
+                    } else {
+                        swordGroup.rotation.z += (0 - swordGroup.rotation.z) * 0.15;
+                        swordGroup.rotation.x += (-Math.PI / 3 - swordGroup.rotation.x) * 0.15;
+                    }
+                }
 
                 // Spawning & Enemy AI
                 if ((isHost || !conn) && STATE.waveActive && STATE.zulusToSpawnInWave > 0 && performance.now() - lastSpawn > CONFIG.baseSpawnInterval) {
@@ -1493,6 +1534,8 @@ html,body{width:100%;height:100%;overflow:hidden;touch-action:none;background:#0
                             dir.normalize();
                             z.group.position.addScaledVector(dir, CONFIG.baseSpeed);
                             z.group.lookAt(z.group.position.x + dir.x, z.group.position.y, z.group.position.z + dir.z);
+                            // The shield and spear face +Z, so +Z points at the player.
+                            z.group.rotation.y = Math.atan2(dir.x, dir.z);
                             z.group.rotation.z = Math.sin(time * 12 + z.animOffset) * 0.08;
                         }
                     });
