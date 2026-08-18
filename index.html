@@ -1,2 +1,2607 @@
-<!doctype html>
-<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><title>Zulu Wars</title><style>html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#071018}iframe{display:block;width:100%;height:100%;border:0}</style></head><body><iframe id="game" src="old3index.html" title="Zulu Wars"></iframe><script src="weapon_fixes.js"></script></body></html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Frontier Pass</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
+        }
+
+        html,
+        body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: #071018;
+            font-family: Arial, Helvetica, sans-serif;
+            color: white;
+        }
+
+        body {
+            position: relative;
+        }
+
+        #canvas-container {
+            position: fixed;
+            inset: 0;
+            display: none;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        #ui-layer {
+            position: fixed;
+            inset: 0;
+            display: none;
+            flex-direction: column;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        #top-ui {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            padding: 15px;
+            width: 100%;
+        }
+
+        .stat-box {
+            min-width: 105px;
+            padding: 8px 12px;
+            border: 1px solid rgba(255,255,255,.25);
+            border-radius: 6px;
+            background: rgba(0,0,0,.45);
+            text-align: center;
+            text-shadow: 0 2px 3px #000;
+        }
+
+        .stat-label {
+            font-size: 11px;
+            opacity: .7;
+            letter-spacing: 1px;
+        }
+
+        .stat-value {
+            margin-top: 2px;
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        #crosshair {
+            display: none;
+            position: fixed;
+            left: 50%;
+            top: 50%;
+            width: 18px;
+            height: 18px;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            z-index: 20;
+        }
+
+        #crosshair::before,
+        #crosshair::after {
+            content: "";
+            position: absolute;
+            background: rgba(255,255,255,.9);
+            box-shadow: 0 0 2px #000;
+        }
+
+        #crosshair::before {
+            left: 8px;
+            top: 0;
+            width: 2px;
+            height: 18px;
+        }
+
+        #crosshair::after {
+            left: 0;
+            top: 8px;
+            width: 18px;
+            height: 2px;
+        }
+
+        #hit-indicator {
+            position: fixed;
+            left: 50%;
+            top: 50%;
+            width: 34px;
+            height: 34px;
+            border: 3px solid #fff;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            opacity: 0;
+            pointer-events: none;
+            z-index: 21;
+        }
+
+        #reload-bar-container {
+            position: fixed;
+            left: 50%;
+            bottom: 80px;
+            width: 220px;
+            height: 9px;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,.65);
+            border: 1px solid rgba(255,255,255,.4);
+            border-radius: 5px;
+            overflow: hidden;
+            display: none;
+            z-index: 20;
+        }
+
+        #reload-bar {
+            width: 0%;
+            height: 100%;
+            background: #ddd;
+        }
+
+        #controls-layer {
+            position: fixed;
+            inset: 0;
+            display: none;
+            pointer-events: none;
+            z-index: 30;
+        }
+
+        #btn-attack,
+        #btn-switch {
+            position: absolute;
+            right: 25px;
+            border-radius: 50%;
+            border: 2px solid rgba(255,255,255,.5);
+            background: rgba(0,0,0,.45);
+            color: white;
+            font-weight: bold;
+            pointer-events: auto;
+            touch-action: none;
+        }
+
+        #btn-attack {
+            bottom: 35px;
+            width: 82px;
+            height: 82px;
+            font-size: 15px;
+        }
+
+        #btn-switch {
+            right: 125px;
+            bottom: 45px;
+            width: 58px;
+            height: 58px;
+            font-size: 11px;
+        }
+
+        #joystick-bound {
+            position: absolute;
+            left: 30px;
+            bottom: 30px;
+            width: 120px;
+            height: 120px;
+            border: 2px solid rgba(255,255,255,.25);
+            border-radius: 50%;
+            background: rgba(0,0,0,.25);
+            pointer-events: auto;
+            touch-action: none;
+        }
+
+        #joystick-thumb {
+            position: absolute;
+            left: 30px;
+            top: 30px;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: rgba(255,255,255,.25);
+            border: 2px solid rgba(255,255,255,.45);
+            transform: translate(0,0);
+            pointer-events: none;
+        }
+
+        #touch-look {
+            position: absolute;
+            right: 0;
+            top: 0;
+            width: 55%;
+            height: 70%;
+            pointer-events: auto;
+            touch-action: none;
+        }
+
+        #spectator-msg {
+            position: fixed;
+            left: 50%;
+            top: 25%;
+            transform: translateX(-50%);
+            padding: 15px 25px;
+            border-radius: 6px;
+            background: rgba(0,0,0,.65);
+            font-size: 20px;
+            font-weight: bold;
+            display: none;
+            pointer-events: none;
+        }
+
+        #wave-banner {
+            position: fixed;
+            left: 50%;
+            top: 35%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity .25s;
+        }
+
+        #wave-title {
+            font-size: 48px;
+            font-weight: 900;
+            letter-spacing: 4px;
+            text-shadow: 0 3px 8px #000;
+        }
+
+        #wave-subtitle {
+            margin-top: 5px;
+            font-size: 17px;
+            letter-spacing: 3px;
+            text-shadow: 0 2px 4px #000;
+        }
+
+        #lobby-modal,
+        #settings-modal,
+        #game-over {
+            position: fixed;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background:
+                radial-gradient(circle at center,
+                    rgba(28,45,54,.72),
+                    rgba(0,0,0,.94));
+            z-index: 100;
+        }
+
+        #settings-modal,
+        #game-over {
+            display: none;
+        }
+
+        .modal-box {
+            width: min(420px, calc(100% - 30px));
+            padding: 30px;
+            border: 1px solid rgba(255,255,255,.22);
+            border-radius: 10px;
+            background: rgba(8,15,20,.94);
+            box-shadow: 0 20px 70px rgba(0,0,0,.65);
+            text-align: center;
+        }
+
+        .modal-box h1 {
+            margin: 0 0 8px;
+            font-size: 32px;
+        }
+
+        .modal-box p {
+            opacity: .7;
+            line-height: 1.5;
+        }
+
+        .modal-box input {
+            width: 100%;
+            padding: 12px;
+            margin: 7px 0;
+            border: 1px solid rgba(255,255,255,.25);
+            border-radius: 5px;
+            background: rgba(255,255,255,.07);
+            color: white;
+            outline: none;
+        }
+
+        .modal-box button {
+            width: 100%;
+            padding: 12px;
+            margin-top: 8px;
+            border: 1px solid rgba(255,255,255,.25);
+            border-radius: 5px;
+            background: rgba(255,255,255,.12);
+            color: white;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .modal-box button:hover {
+            background: rgba(255,255,255,.2);
+        }
+
+        #network-status {
+            margin-top: 12px;
+            font-size: 12px;
+            opacity: .65;
+        }
+
+        #room-code-badge {
+            display: none;
+            margin-top: 12px;
+            padding: 8px;
+            border-radius: 5px;
+            background: rgba(255,255,255,.08);
+        }
+
+        #room-code-val {
+            font-size: 24px;
+            font-weight: bold;
+            letter-spacing: 5px;
+        }
+
+        @media (min-width: 800px) {
+            #controls-layer {
+                display: none !important;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="canvas-container"></div>
+
+    <div id="ui-layer">
+        <div id="top-ui">
+            <div class="stat-box">
+                <div class="stat-label">HEALTH</div>
+                <div class="stat-value" id="hp-val">100</div>
+            </div>
+
+            <div class="stat-box">
+                <div class="stat-label">WAVE</div>
+                <div class="stat-value" id="wave-val">1</div>
+            </div>
+
+            <div class="stat-box">
+                <div class="stat-label">SCORE</div>
+                <div class="stat-value" id="score-val">0</div>
+            </div>
+
+            <div class="stat-box">
+                <div class="stat-label">WEAPON</div>
+                <div class="stat-value" id="weapon-val">MUSKET</div>
+            </div>
+        </div>
+    </div>
+
+    <div id="crosshair"></div>
+    <div id="hit-indicator"></div>
+
+    <div id="reload-bar-container">
+        <div id="reload-bar"></div>
+    </div>
+
+    <div id="wave-banner">
+        <div id="wave-title">WAVE 1</div>
+        <div id="wave-subtitle">HOLD THE LINE</div>
+    </div>
+
+    <div id="spectator-msg">
+        SPECTATING — WAITING FOR YOUR COMRADE
+    </div>
+
+    <div id="controls-layer">
+        <div id="touch-look"></div>
+
+        <div id="joystick-bound">
+            <div id="joystick-thumb"></div>
+        </div>
+
+        <button id="btn-switch">SWITCH</button>
+        <button id="btn-attack">FIRE</button>
+    </div>
+
+    <div id="lobby-modal">
+        <div class="modal-box">
+            <h1>FRONTIER PASS</h1>
+            <p>Defend the pass against the advancing Zulu warriors.</p>
+
+            <input id="player-name"
+                   type="text"
+                   maxlength="20"
+                   placeholder="Your name">
+
+            <button id="create-room">
+                CREATE ROOM
+            </button>
+
+            <input id="room-code-input"
+                   type="text"
+                   maxlength="4"
+                   inputmode="numeric"
+                   placeholder="4-digit room code">
+
+            <button id="join-room">
+                JOIN ROOM
+            </button>
+
+            <div id="room-code-badge">
+                ROOM CODE
+                <div id="room-code-val">----</div>
+            </div>
+
+            <div id="network-status">
+                OFFLINE
+            </div>
+        </div>
+    </div>
+
+    <div id="settings-modal">
+        <div class="modal-box">
+            <h1>SETTINGS</h1>
+            <button id="close-settings">CLOSE</button>
+        </div>
+    </div>
+
+    <div id="game-over">
+        <div class="modal-box">
+            <h1>GAME OVER</h1>
+
+            <p>
+                Final Wave:
+                <strong id="final-wave">1</strong>
+            </p>
+
+            <p>
+                Final Score:
+                <strong id="final-score">0</strong>
+            </p>
+
+            <button id="restart-game">
+                PLAY AGAIN
+            </button>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+
+    <script>
+        /* ============================================================
+           FRONTIER PASS
+           PART 1/3
+           ============================================================ */
+
+        const GAME_VERSION = "1.0.0";
+
+        const CONFIG = {
+            musketCooldown: 3500,
+            swordCooldown: 500,
+            swordRange: 2.7,
+            swordDamage: 1,
+            zuluDamage: 12,
+            baseSpawnInterval: 1500,
+            baseSpeed: 0.018
+        };
+
+        const STATE = {
+            gameStarted: false,
+            gameOver: false,
+            settingsOpen: false,
+
+            hp: 100,
+            score: 0,
+
+            wave: 1,
+            waveActive: false,
+
+            zulusToSpawnInWave: 0,
+            zulusRemainingInWave: 0,
+
+            isDead: false,
+            remoteIsDead: false,
+
+            isMoving: false,
+            remoteIsMoving: false,
+
+            weapon: "musket",
+            remoteWeapon: "musket",
+
+            reloading: false,
+            lastAttackTime: 0,
+
+            cameraMode: "1P"
+        };
+
+        let scene;
+        let camera;
+        let renderer;
+
+        let player;
+        let playerModel;
+
+        let remotePlayerMesh;
+        let remotePlayerName = "";
+
+        let cameraNode;
+        let weaponNode;
+
+        let musketGroup;
+        let swordGroup;
+
+        let peer = null;
+        let conn = null;
+        let isHost = false;
+        let playerName = "Player";
+
+        let zuluIdCounter = 1;
+
+        const barricades = [];
+
+        /* ============================================================
+           RENDERER
+           ============================================================ */
+
+        renderer = new THREE.WebGLRenderer({
+            antialias: true,
+            powerPreference: "high-performance"
+        });
+
+        renderer.setPixelRatio(
+            Math.min(window.devicePixelRatio || 1, 2)
+        );
+
+        renderer.setSize(
+            window.innerWidth,
+            window.innerHeight
+        );
+
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+        document
+            .getElementById("canvas-container")
+            .appendChild(renderer.domElement);
+
+        scene = new THREE.Scene();
+
+        scene.background = new THREE.Color(0x8fa2a1);
+
+        scene.fog = new THREE.Fog(
+            0x8fa2a1,
+            35,
+            130
+        );
+
+        camera = new THREE.PerspectiveCamera(
+            70,
+            window.innerWidth / window.innerHeight,
+            0.05,
+            250
+        );
+
+        camera.position.set(0, 0, 0);
+
+        /* ============================================================
+           LIGHTING
+           ============================================================ */
+
+        const hemiLight = new THREE.HemisphereLight(
+            0xe8f1f0,
+            0x3a2d24,
+            1.5
+        );
+
+        scene.add(hemiLight);
+
+        const sunLight = new THREE.DirectionalLight(
+            0xfff1d0,
+            2.1
+        );
+
+        sunLight.position.set(
+            -35,
+            55,
+            -30
+        );
+
+        sunLight.castShadow = true;
+
+        sunLight.shadow.mapSize.width = 2048;
+        sunLight.shadow.mapSize.height = 2048;
+
+        sunLight.shadow.camera.left = -70;
+        sunLight.shadow.camera.right = 70;
+        sunLight.shadow.camera.top = 70;
+        sunLight.shadow.camera.bottom = -70;
+
+        scene.add(sunLight);
+
+        /* ============================================================
+           MATERIALS
+           ============================================================ */
+
+        const groundMat =
+            new THREE.MeshStandardMaterial({
+                color: 0x66583e,
+                roughness: 1
+            });
+
+        const tunicMat =
+            new THREE.MeshStandardMaterial({
+                color: 0x7b352d,
+                roughness: 0.9
+            });
+
+        const redDarkMat =
+            new THREE.MeshStandardMaterial({
+                color: 0x51231f,
+                roughness: 0.95
+            });
+
+        const pantsMat =
+            new THREE.MeshStandardMaterial({
+                color: 0x3e4037,
+                roughness: 1
+            });
+
+        const bootMat =
+            new THREE.MeshStandardMaterial({
+                color: 0x241a13,
+                roughness: 0.95
+            });
+
+        const skinMat =
+            new THREE.MeshStandardMaterial({
+                color: 0xc58b68,
+                roughness: 0.95
+            });
+
+        const hairMat =
+            new THREE.MeshStandardMaterial({
+                color: 0x221713,
+                roughness: 1
+            });
+
+        const helmetMat =
+            new THREE.MeshStandardMaterial({
+                color: 0xc6b98b,
+                roughness: 0.9
+            });
+
+        const helmetBandMat =
+            new THREE.MeshStandardMaterial({
+                color: 0x61483a,
+                roughness: 0.95
+            });
+
+        const beltMat =
+            new THREE.MeshStandardMaterial({
+                color: 0x33251b,
+                roughness: 0.95
+            });
+
+        const whiteBeltMat =
+            new THREE.MeshStandardMaterial({
+                color: 0xd8d1b7,
+                roughness: 0.85
+            });
+
+        const musketWoodMat =
+            new THREE.MeshStandardMaterial({
+                color: 0x4b2d15,
+                roughness: 0.8
+            });
+
+        const ironMat =
+            new THREE.MeshStandardMaterial({
+                color: 0x5b5d59,
+                metalness: 0.75,
+                roughness: 0.35
+            });
+
+        const leatherMat =
+            new THREE.MeshStandardMaterial({
+                color: 0x352318,
+                roughness: 0.9
+            });
+
+        const swordMat =
+            new THREE.MeshStandardMaterial({
+                color: 0xd8d8d2,
+                metalness: 0.9,
+                roughness: 0.25
+            });
+
+        /* ============================================================
+           WORLD
+           ============================================================ */
+
+        const ground = new THREE.Mesh(
+            new THREE.PlaneGeometry(180, 180),
+            groundMat
+        );
+
+        ground.rotation.x = -Math.PI / 2;
+        ground.position.y = -0.01;
+        ground.receiveShadow = true;
+
+        scene.add(ground);
+
+        /* ============================================================
+           SIMPLE TERRAIN / MOUNTAIN COLLISION
+           ============================================================ */
+
+        const mountains = [];
+
+        function createMountain(
+            x,
+            z,
+            width,
+            height,
+            depth
+        ) {
+            const mesh = new THREE.Mesh(
+                new THREE.ConeGeometry(
+                    width,
+                    height,
+                    7
+                ),
+                new THREE.MeshStandardMaterial({
+                    color: 0x4a4a3b,
+                    roughness: 1
+                })
+            );
+
+            mesh.position.set(
+                x,
+                height / 2 - 0.02,
+                z
+            );
+
+            mesh.scale.z =
+                depth / width;
+
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
+
+            scene.add(mesh);
+
+            mountains.push({
+                mesh,
+                x,
+                z,
+                radius: width * 0.85
+            });
+        }
+
+        createMountain(-42, -35, 13, 20, 18);
+        createMountain(42, -35, 15, 24, 20);
+        createMountain(-52, 5, 12, 18, 17);
+        createMountain(52, 8, 14, 22, 18);
+        createMountain(-48, 42, 17, 28, 22);
+        createMountain(48, 42, 17, 27, 22);
+
+        function checkMountainCollision(pos) {
+            for (const m of mountains) {
+                const dx = pos.x - m.x;
+                const dz = pos.z - m.z;
+
+                if (
+                    dx * dx + dz * dz <
+                    m.radius * m.radius
+                ) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        /* ============================================================
+           BARRICADES
+           ============================================================ */
+
+        function createBarricade(
+            x,
+            z,
+            rotation = 0
+        ) {
+            const group = new THREE.Group();
+
+            const woodMat =
+                new THREE.MeshStandardMaterial({
+                    color: 0x57371e,
+                    roughness: 1
+                });
+
+            for (let i = -1; i <= 1; i++) {
+                const beam = new THREE.Mesh(
+                    new THREE.BoxGeometry(
+                        0.24,
+                        1.15,
+                        3.0
+                    ),
+                    woodMat
+                );
+
+                beam.position.set(
+                    i * 0.55,
+                    0.58,
+                    0
+                );
+
+                beam.rotation.z =
+                    (i === 0 ? 0 : i * 0.12);
+
+                beam.castShadow = true;
+                beam.receiveShadow = true;
+
+                group.add(beam);
+            }
+
+            group.position.set(x, 0, z);
+            group.rotation.y = rotation;
+
+            scene.add(group);
+
+            const obj = {
+                x,
+                z,
+                mesh: group,
+                active: true,
+                touchTimer: 0
+            };
+
+            barricades.push(obj);
+
+            return obj;
+        }
+
+        createBarricade(0, -8, 0);
+        createBarricade(-7, -12, 0.12);
+        createBarricade(7, -12, -0.12);
+
+        function resetBarricades() {
+            barricades.forEach(b => {
+                b.active = true;
+                b.touchTimer = 0;
+                b.mesh.visible = true;
+            });
+        }
+
+        /* ============================================================
+           SOLDIER MODEL
+           ============================================================ */
+
+        /*
+         * IMPORTANT:
+         *
+         * The soldier uses actual shoulder/elbow/hand positioning.
+         * The previous version rotated a long cylinder directly toward
+         * the target, which made the arms point backwards when the
+         * musket changed orientation.
+         *
+         * The new model stores shoulder pivots and an elbow target.
+         * The musket is also built with its STOCK at negative local Y
+         * and MUZZLE at positive local Y.
+         */
+
+        function createArmPose(
+            shoulder,
+            elbow,
+            hand,
+            material
+        ) {
+            const group = new THREE.Group();
+
+            group.position.copy(shoulder);
+
+            const upperLength =
+                shoulder.distanceTo(elbow);
+
+            const lowerLength =
+                elbow.distanceTo(hand);
+
+            const upper = new THREE.Mesh(
+                new THREE.CylinderGeometry(
+                    0.078,
+                    0.087,
+                    upperLength,
+                    7
+                ),
+                material
+            );
+
+            upper.position.copy(
+                elbow.clone()
+                    .sub(shoulder)
+                    .multiplyScalar(0.5)
+            );
+
+            const lower = new THREE.Mesh(
+                new THREE.CylinderGeometry(
+                    0.065,
+                    0.075,
+                    lowerLength,
+                    7
+                ),
+                material
+            );
+
+            lower.position.copy(
+                hand.clone()
+                    .sub(elbow)
+                    .multiplyScalar(0.5)
+            );
+
+            const handMesh = new THREE.Mesh(
+                new THREE.SphereGeometry(
+                    0.078,
+                    7,
+                    5
+                ),
+                skinMat
+            );
+
+            handMesh.position.copy(
+                hand.clone().sub(shoulder)
+            );
+
+            group.add(
+                upper,
+                lower,
+                handMesh
+            );
+
+            return group;
+        }
+
+        function createSoldierMesh() {
+            const pModel =
+                new THREE.Group();
+
+            /*
+             * Torso
+             */
+
+            const torso = new THREE.Mesh(
+                new THREE.BoxGeometry(
+                    0.68,
+                    0.70,
+                    0.38
+                ),
+                tunicMat
+            );
+
+            torso.position.set(
+                0,
+                1.15,
+                0
+            );
+
+            torso.scale.set(
+                1,
+                1.05,
+                1
+            );
+
+            torso.castShadow = true;
+            torso.receiveShadow = true;
+
+            pModel.add(torso);
+
+            /*
+             * Front lapels / white cross-belts.
+             */
+
+            const beltA = new THREE.Mesh(
+                new THREE.BoxGeometry(
+                    0.075,
+                    0.88,
+                    0.035
+                ),
+                whiteBeltMat
+            );
+
+            beltA.position.set(
+                0,
+                1.10,
+                -0.205
+            );
+
+            beltA.rotation.z = -0.52;
+
+            const beltB = new THREE.Mesh(
+                new THREE.BoxGeometry(
+                    0.075,
+                    0.88,
+                    0.035
+                ),
+                whiteBeltMat
+            );
+
+            beltB.position.set(
+                0,
+                1.10,
+                -0.205
+            );
+
+            beltB.rotation.z = 0.52;
+
+            pModel.add(
+                beltA,
+                beltB
+            );
+
+            /*
+             * Waist belt.
+             */
+
+            const waistBelt = new THREE.Mesh(
+                new THREE.BoxGeometry(
+                    0.70,
+                    0.075,
+                    0.40
+                ),
+                beltMat
+            );
+
+            waistBelt.position.set(
+                0,
+                0.82,
+                0
+            );
+
+            pModel.add(waistBelt);
+
+            /*
+             * Front ammunition pouch.
+             */
+
+            const pouch = new THREE.Mesh(
+                new THREE.BoxGeometry(
+                    0.18,
+                    0.20,
+                    0.08
+                ),
+                beltMat
+            );
+
+            pouch.position.set(
+                0.30,
+                0.82,
+                -0.21
+            );
+
+            pouch.rotation.z = -0.15;
+
+            pModel.add(pouch);
+
+            /*
+             * Collar / neck.
+             */
+
+            const neck = new THREE.Mesh(
+                new THREE.CylinderGeometry(
+                    0.13,
+                    0.14,
+                    0.16,
+                    8
+                ),
+                redDarkMat
+            );
+
+            neck.position.y = 1.49;
+
+            pModel.add(neck);
+
+            /*
+             * Head.
+             */
+
+            const headMesh = new THREE.Mesh(
+                new THREE.SphereGeometry(
+                    0.225,
+                    10,
+                    7
+                ),
+                skinMat
+            );
+
+            headMesh.position.set(
+                0,
+                1.68,
+                -0.015
+            );
+
+            headMesh.scale.set(
+                0.92,
+                1.08,
+                0.90
+            );
+
+            headMesh.castShadow = true;
+
+            pModel.add(headMesh);
+
+            /*
+             * Hair / side silhouette.
+             */
+
+            const hairBack = new THREE.Mesh(
+                new THREE.SphereGeometry(
+                    0.205,
+                    8,
+                    6
+                ),
+                hairMat
+            );
+
+            hairBack.position.set(
+                0,
+                1.70,
+                0.10
+            );
+
+            hairBack.scale.set(
+                0.92,
+                1.03,
+                0.50
+            );
+
+            pModel.add(hairBack);
+
+            /*
+             * Moustache.
+             */
+
+            const moustache = new THREE.Mesh(
+                new THREE.BoxGeometry(
+                    0.14,
+                    0.035,
+                    0.035
+                ),
+                hairMat
+            );
+
+            moustache.position.set(
+                0,
+                1.64,
+                -0.205
+            );
+
+            pModel.add(moustache);
+
+            /*
+             * Nose.
+             */
+
+            const nose = new THREE.Mesh(
+                new THREE.ConeGeometry(
+                    0.025,
+                    0.065,
+                    6
+                ),
+                skinMat
+            );
+
+            nose.rotation.x =
+                Math.PI / 2;
+
+            nose.position.set(
+                0,
+                1.665,
+                -0.215
+            );
+
+            pModel.add(nose);
+
+            /*
+             * Pith helmet.
+             */
+
+            const helmetDome =
+                new THREE.Mesh(
+                    new THREE.SphereGeometry(
+                        0.255,
+                        10,
+                        7
+                    ),
+                    helmetMat
+                );
+
+            helmetDome.scale.set(
+                1.0,
+                0.72,
+                1.0
+            );
+
+            helmetDome.position.set(
+                0,
+                1.89,
+                0
+            );
+
+            const helmetBrim =
+                new THREE.Mesh(
+                    new THREE.CylinderGeometry(
+                        0.32,
+                        0.30,
+                        0.055,
+                        12
+                    ),
+                    helmetMat
+                );
+
+            helmetBrim.position.set(
+                0,
+                1.80,
+                0
+            );
+
+            const helmetBand =
+                new THREE.Mesh(
+                    new THREE.CylinderGeometry(
+                        0.265,
+                        0.265,
+                        0.055,
+                        12
+                    ),
+                    helmetBandMat
+                );
+
+            helmetBand.position.set(
+                0,
+                1.80,
+                0
+            );
+
+            pModel.add(
+                helmetDome,
+                helmetBrim,
+                helmetBand
+            );
+
+            /*
+             * Legs.
+             */
+
+            const leftLegPivot =
+                new THREE.Group();
+
+            leftLegPivot.position.set(
+                -0.17,
+                0.69,
+                0
+            );
+
+            const leftLegMesh =
+                new THREE.Mesh(
+                    new THREE.CylinderGeometry(
+                        0.115,
+                        0.105,
+                        0.66,
+                        7
+                    ),
+                    pantsMat
+                );
+
+            leftLegMesh.position.y =
+                -0.33;
+
+            const leftBoot =
+                new THREE.Mesh(
+                    new THREE.BoxGeometry(
+                        0.19,
+                        0.20,
+                        0.32
+                    ),
+                    bootMat
+                );
+
+            leftBoot.position.set(
+                0,
+                -0.69,
+                -0.055
+            );
+
+            leftBoot.scale.z = 1.12;
+
+            leftLegPivot.add(
+                leftLegMesh,
+                leftBoot
+            );
+
+            pModel.add(leftLegPivot);
+
+            const rightLegPivot =
+                new THREE.Group();
+
+            rightLegPivot.position.set(
+                0.17,
+                0.69,
+                0
+            );
+
+            const rightLegMesh =
+                new THREE.Mesh(
+                    new THREE.CylinderGeometry(
+                        0.115,
+                        0.105,
+                        0.66,
+                        7
+                    ),
+                    pantsMat
+                );
+
+            rightLegMesh.position.y =
+                -0.33;
+
+            const rightBoot =
+                new THREE.Mesh(
+                    new THREE.BoxGeometry(
+                        0.19,
+                        0.20,
+                        0.32
+                    ),
+                    bootMat
+                );
+
+            rightBoot.position.set(
+                0,
+                -0.69,
+                -0.055
+            );
+
+            rightBoot.scale.z = 1.12;
+
+            rightLegPivot.add(
+                rightLegMesh,
+                rightBoot
+            );
+
+            pModel.add(rightLegPivot);
+
+            /*
+             * ========================================================
+             * SHOULDER / ARM SYSTEM
+             * ========================================================
+             *
+             * Each arm is now a 2-segment arm:
+             *
+             * shoulder -> elbow -> hand
+             *
+             * This prevents the old backwards arm problem.
+             */
+
+            const leftShoulder =
+                new THREE.Vector3(
+                    -0.35,
+                    1.35,
+                    -0.01
+                );
+
+            const rightShoulder =
+                new THREE.Vector3(
+                    0.35,
+                    1.35,
+                    -0.01
+                );
+
+            const leftArmPivot =
+                new THREE.Group();
+
+            leftArmPivot.position.copy(
+                leftShoulder
+            );
+
+            const rightArmPivot =
+                new THREE.Group();
+
+            rightArmPivot.position.copy(
+                rightShoulder
+            );
+
+            /*
+             * Upper/lower arm pieces are created manually here.
+             * Their transforms are updated by updateCharacterPose().
+             */
+
+            const leftUpper =
+                new THREE.Mesh(
+                    new THREE.CylinderGeometry(
+                        0.085,
+                        0.075,
+                        0.30,
+                        7
+                    ),
+                    tunicMat
+                );
+
+            const leftLower =
+                new THREE.Mesh(
+                    new THREE.CylinderGeometry(
+                        0.073,
+                        0.064,
+                        0.28,
+                        7
+                    ),
+                    tunicMat
+                );
+
+            const leftHand =
+                new THREE.Mesh(
+                    new THREE.SphereGeometry(
+                        0.078,
+                        7,
+                        5
+                    ),
+                    skinMat
+                );
+
+            leftArmPivot.add(
+                leftUpper,
+                leftLower,
+                leftHand
+            );
+
+            const rightUpper =
+                new THREE.Mesh(
+                    new THREE.CylinderGeometry(
+                        0.085,
+                        0.075,
+                        0.30,
+                        7
+                    ),
+                    tunicMat
+                );
+
+            const rightLower =
+                new THREE.Mesh(
+                    new THREE.CylinderGeometry(
+                        0.073,
+                        0.064,
+                        0.28,
+                        7
+                    ),
+                    tunicMat
+                );
+
+            const rightHand =
+                new THREE.Mesh(
+                    new THREE.SphereGeometry(
+                        0.078,
+                        7,
+                        5
+                    ),
+                    skinMat
+                );
+
+            rightArmPivot.add(
+                rightUpper,
+                rightLower,
+                rightHand
+            );
+
+            pModel.add(
+                leftArmPivot,
+                rightArmPivot
+            );
+
+            /*
+             * ========================================================
+             * MUSKET
+             * ========================================================
+             *
+             * LOCAL +Y = toward muzzle.
+             *
+             * Stock is behind the hands.
+             * Barrel extends toward +Y.
+             *
+             * The complete weapon is later tilted forward so the
+             * muzzle points up and away from the soldier.
+             */
+
+            const tpMusket =
+                new THREE.Group();
+
+            const tpStock =
+                new THREE.Mesh(
+                    new THREE.BoxGeometry(
+                        0.105,
+                        0.72,
+                        0.10
+                    ),
+                    musketWoodMat
+                );
+
+            tpStock.position.y =
+                -0.31;
+
+            tpStock.castShadow = true;
+
+            const tpLock =
+                new THREE.Mesh(
+                    new THREE.BoxGeometry(
+                        0.075,
+                        0.15,
+                        0.075
+                    ),
+                    ironMat
+                );
+
+            tpLock.position.set(
+                0,
+                0.08,
+                0
+            );
+
+            const tpBarrel =
+                new THREE.Mesh(
+                    new THREE.CylinderGeometry(
+                        0.027,
+                        0.032,
+                        1.32,
+                        8
+                    ),
+                    ironMat
+                );
+
+            tpBarrel.position.y =
+                0.80;
+
+            tpBarrel.castShadow = true;
+
+            const tpMuzzle =
+                new THREE.Mesh(
+                    new THREE.CylinderGeometry(
+                        0.038,
+                        0.038,
+                        0.075,
+                        8
+                    ),
+                    ironMat
+                );
+
+            tpMuzzle.position.y =
+                1.48;
+
+            const tpFrontSight =
+                new THREE.Mesh(
+                    new THREE.BoxGeometry(
+                        0.018,
+                        0.08,
+                        0.018
+                    ),
+                    ironMat
+                );
+
+            tpFrontSight.position.set(
+                0,
+                1.46,
+                0
+            );
+
+            tpMusket.add(
+                tpStock,
+                tpLock,
+                tpBarrel,
+                tpMuzzle,
+                tpFrontSight
+            );
+
+            /*
+             * This is deliberately kept in front of the torso.
+             * The muzzle points toward -Z in the soldier's forward
+             * direction after the weapon's local rotation.
+             */
+
+            tpMusket.position.set(
+                0.02,
+                0.94,
+                -0.30
+            );
+
+            tpMusket.rotation.z =
+                -0.38;
+
+            pModel.add(tpMusket);
+
+            /*
+             * Musket sling.
+             */
+
+            const sling =
+                new THREE.Mesh(
+                    new THREE.BoxGeometry(
+                        0.025,
+                        0.98,
+                        0.025
+                    ),
+                    leatherMat
+                );
+
+            sling.position.set(
+                -0.09,
+                0.84,
+                -0.35
+            );
+
+            sling.rotation.z =
+                -0.38;
+
+            pModel.add(sling);
+
+            /*
+             * Sword.
+             */
+
+            const tpSword =
+                new THREE.Group();
+
+            const tpBlade =
+                new THREE.Mesh(
+                    new THREE.BoxGeometry(
+                        0.045,
+                        0.88,
+                        0.018
+                    ),
+                    swordMat
+                );
+
+            tpBlade.position.y =
+                0.45;
+
+            const tpHilt =
+                new THREE.Mesh(
+                    new THREE.BoxGeometry(
+                        0.20,
+                        0.045,
+                        0.065
+                    ),
+                    ironMat
+                );
+
+            tpHilt.position.y =
+                0.02;
+
+            tpSword.add(
+                tpBlade,
+                tpHilt
+            );
+
+            tpSword.position.set(
+                0.38,
+                0.74,
+                -0.02
+            );
+
+            tpSword.rotation.z =
+                0.10;
+
+            tpSword.visible = false;
+
+            pModel.add(tpSword);
+
+            /*
+             * User data used by the animation/network system.
+             */
+
+            pModel.userData = {
+                musket: tpMusket,
+                sword: tpSword,
+
+                leftArm: leftArmPivot,
+                rightArm: rightArmPivot,
+
+                leftUpper,
+                leftLower,
+                leftHand,
+
+                rightUpper,
+                rightLower,
+                rightHand,
+
+                leftLeg: leftLegPivot,
+                rightLeg: rightLegPivot,
+
+                leftShoulder,
+                rightShoulder
+            };
+
+            /*
+             * Make all model pieces cast shadows.
+             */
+
+            pModel.traverse(obj => {
+                if (obj.isMesh) {
+                    obj.castShadow = true;
+                    obj.receiveShadow = true;
+                }
+            });
+
+            return pModel;
+        }
+              // Enemies & Hitboxes
+        const zulus = [];
+        const zuluMat = new THREE.MeshStandardMaterial({
+            color: 0x5d3f32,
+            roughness: 0.95
+        });
+
+        function createZulu(id = null, x = null, z = null) {
+            const group = new THREE.Group();
+
+            const body = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.38, 0.35, 1.4),
+                zuluMat
+            );
+            body.position.y = 1.2;
+            group.add(body);
+
+            const head = new THREE.Mesh(
+                new THREE.SphereGeometry(0.28, 8, 8),
+                zuluMat
+            );
+            head.position.y = 2.1;
+            group.add(head);
+
+            const shield = new THREE.Mesh(
+                new THREE.BoxGeometry(0.6, 1.3, 0.05),
+                new THREE.MeshStandardMaterial({ color: 0x8b6a45 })
+            );
+            shield.position.set(-0.4, 1.2, 0.3);
+            group.add(shield);
+
+            const spearShaft = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.02, 0.02, 2.2),
+                new THREE.MeshStandardMaterial({ color: 0x4a2e11 })
+            );
+            spearShaft.rotation.x = Math.PI / 2;
+            spearShaft.position.set(0.4, 1.2, 0.4);
+            group.add(spearShaft);
+
+            const zId = id !== null ? id : zuluIdCounter++;
+
+            const headHitbox = new THREE.Mesh(
+                new THREE.SphereGeometry(0.32, 8, 8),
+                new THREE.MeshBasicMaterial({ visible: false })
+            );
+            headHitbox.position.y = 2.1;
+            headHitbox.userData = {
+                zuluId: zId,
+                part: 'head'
+            };
+            group.add(headHitbox);
+
+            const bodyHitbox = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.42, 0.38, 1.4, 8),
+                new THREE.MeshBasicMaterial({ visible: false })
+            );
+            bodyHitbox.position.y = 1.2;
+            bodyHitbox.userData = {
+                zuluId: zId,
+                part: 'body'
+            };
+            group.add(bodyHitbox);
+
+            const posX =
+                x !== null
+                    ? x
+                    : (Math.random() - 0.5) * 36;
+
+            const posZ =
+                z !== null
+                    ? z
+                    : (-45 - Math.random() * 10);
+
+            group.position.set(posX, 0, posZ);
+            scene.add(group);
+
+            const zObj = {
+                id: zId,
+                group: group,
+                headHitbox: headHitbox,
+                bodyHitbox: bodyHitbox,
+                hp: 2,
+                animOffset: Math.random() * 10
+            };
+
+            zulus.push(zObj);
+            return zObj;
+        }
+
+        function syncZulusFromHost(hostZulus) {
+            const hostIds = hostZulus.map(hz => hz.id);
+
+            for (let i = zulus.length - 1; i >= 0; i--) {
+                if (!hostIds.includes(zulus[i].id)) {
+                    scene.remove(zulus[i].group);
+                    zulus.splice(i, 1);
+                }
+            }
+
+            hostZulus.forEach(hz => {
+                let z = zulus.find(item => item.id === hz.id);
+
+                if (!z) {
+                    z = createZulu(hz.id, hz.x, hz.z);
+                } else {
+                    z.group.position.x = hz.x;
+                    z.group.position.z = hz.z;
+                    z.hp = hz.hp;
+                }
+            });
+        }
+
+        function setCameraMode(mode) {
+            STATE.cameraMode = mode;
+
+            if (mode === '1P') {
+                camera.position.set(0, 0, 0);
+                playerModel.visible = false;
+                weaponNode.visible = !STATE.isDead;
+            } else {
+                camera.position.set(0, 0.85, 3.9);
+                playerModel.visible = !STATE.isDead;
+                weaponNode.visible = false;
+            }
+        }
+
+        function toggleSettings() {
+            STATE.settingsOpen = !STATE.settingsOpen;
+
+            document.getElementById('settings-modal').style.display =
+                STATE.settingsOpen ? 'flex' : 'none';
+        }
+
+        function showWaveBanner(title, subtitle) {
+            const banner = document.getElementById('wave-banner');
+
+            document.getElementById('wave-title').innerText = title;
+            document.getElementById('wave-subtitle').innerText = subtitle;
+
+            banner.style.opacity = '1';
+
+            setTimeout(() => {
+                banner.style.opacity = '0';
+            }, 2500);
+        }
+
+        function startWave(num) {
+            STATE.wave = num;
+            STATE.zulusToSpawnInWave = 4 + num * 4;
+            STATE.zulusRemainingInWave = STATE.zulusToSpawnInWave;
+            STATE.waveActive = false;
+
+            resetBarricades();
+
+            document.getElementById('wave-val').innerText = STATE.wave;
+
+            showWaveBanner(
+                `WAVE ${num}`,
+                `HOLD THE LINE`
+            );
+
+            if (conn && conn.open && isHost) {
+                conn.send({
+                    type: 'WAVE_START',
+                    wave: num
+                });
+            }
+
+            setTimeout(() => {
+                STATE.waveActive = true;
+            }, 2500);
+        }
+
+        function switchWeapon() {
+            if (STATE.reloading || STATE.isDead) return;
+
+            STATE.weapon =
+                STATE.weapon === 'musket'
+                    ? 'sword'
+                    : 'musket';
+
+            musketGroup.visible =
+                STATE.weapon === 'musket';
+
+            swordGroup.visible =
+                STATE.weapon === 'sword';
+
+            document.getElementById('weapon-val').innerText =
+                STATE.weapon === 'musket'
+                    ? 'MUSKET'
+                    : 'SWORD';
+        }
+
+        function showHitFeedback() {
+            const ind =
+                document.getElementById('hit-indicator');
+
+            ind.style.opacity = '1';
+
+            setTimeout(() => {
+                ind.style.opacity = '0';
+            }, 90);
+        }
+
+        function damageZulu(
+            zuluId,
+            damageAmount,
+            hitPoint = null
+        ) {
+            const idx =
+                zulus.findIndex(z => z.id === zuluId);
+
+            if (idx === -1) return;
+
+            const z = zulus[idx];
+
+            z.hp -= damageAmount;
+
+            showHitFeedback();
+
+            if (hitPoint) {
+                spawnHitRing(hitPoint);
+            } else {
+                spawnHitRing(
+                    z.group.position.clone().add(
+                        new THREE.Vector3(0, 1.2, 0)
+                    )
+                );
+            }
+
+            if (z.hp <= 0) {
+                scene.remove(z.group);
+                zulus.splice(idx, 1);
+
+                STATE.score++;
+                STATE.zulusRemainingInWave--;
+
+                document.getElementById('score-val').innerText =
+                    STATE.score;
+
+                if (
+                    isHost &&
+                    STATE.zulusRemainingInWave <= 0 &&
+                    STATE.zulusToSpawnInWave <= 0
+                ) {
+                    STATE.waveActive = false;
+
+                    setTimeout(() => {
+                        startWave(STATE.wave + 1);
+                    }, 3000);
+                }
+            }
+        }
+
+        function performAttack() {
+            const now = performance.now();
+
+            if (
+                STATE.gameOver ||
+                !STATE.gameStarted ||
+                STATE.settingsOpen ||
+                STATE.isDead
+            ) {
+                return;
+            }
+
+            const dir =
+                camera.getWorldDirection(
+                    new THREE.Vector3()
+                );
+
+            if (STATE.weapon === 'musket') {
+
+                if (STATE.reloading) return;
+
+                STATE.reloading = true;
+                STATE.lastAttackTime = now;
+
+                document.getElementById(
+                    'reload-bar-container'
+                ).style.display = 'block';
+
+                weaponNode.position.z += 0.25;
+                weaponNode.rotation.x += 0.25;
+
+                const originCamPos =
+                    camera.getWorldPosition(
+                        new THREE.Vector3()
+                    );
+
+                spawnGunSmoke(
+                    originCamPos,
+                    dir
+                );
+
+                if (conn && conn.open) {
+                    conn.send({
+                        type: 'SMOKE_FX',
+                        x: originCamPos.x,
+                        y: originCamPos.y,
+                        z: originCamPos.z,
+                        dx: dir.x,
+                        dy: dir.y,
+                        dz: dir.z
+                    });
+                }
+
+                const hitboxes = [];
+
+                zulus.forEach(z => {
+                    if (z.headHitbox) {
+                        hitboxes.push(z.headHitbox);
+                    }
+
+                    if (z.bodyHitbox) {
+                        hitboxes.push(z.bodyHitbox);
+                    }
+                });
+
+                const raycaster = new THREE.Raycaster(
+                    camera.getWorldPosition(
+                        new THREE.Vector3()
+                    ),
+                    dir
+                );
+
+                const hits =
+                    raycaster.intersectObjects(hitboxes);
+
+                if (hits.length > 0) {
+                    const hitObj = hits[0].object;
+
+                    const zuluId =
+                        hitObj.userData.zuluId;
+
+                    const part =
+                        hitObj.userData.part;
+
+                    const hitZulu =
+                        zulus.find(
+                            z => z.id === zuluId
+                        );
+
+                    if (hitZulu) {
+                        const damage =
+                            part === 'head'
+                                ? 2
+                                : 1;
+
+                        showHitFeedback();
+                        spawnHitRing(hits[0].point);
+
+                        if (isHost || !conn) {
+                            damageZulu(
+                                hitZulu.id,
+                                damage,
+                                hits[0].point
+                            );
+                        } else {
+                            conn.send({
+                                type: 'HIT_ZULU',
+                                zuluId: hitZulu.id,
+                                damage: damage,
+                                hitPos: {
+                                    x: hits[0].point.x,
+                                    y: hits[0].point.y,
+                                    z: hits[0].point.z
+                                }
+                            });
+                        }
+                    }
+                }
+
+            } else {
+
+                if (
+                    now - STATE.lastAttackTime <
+                    CONFIG.swordCooldown
+                ) {
+                    return;
+                }
+
+                STATE.lastAttackTime = now;
+
+                swordGroup.rotation.z =
+                    -Math.PI / 1.5;
+
+                const camPos =
+                    camera.getWorldPosition(
+                        new THREE.Vector3()
+                    );
+
+                for (
+                    let i = zulus.length - 1;
+                    i >= 0;
+                    i--
+                ) {
+                    const zPos =
+                        zulus[i].group.position.clone().add(
+                            new THREE.Vector3(0, 1.2, 0)
+                        );
+
+                    if (
+                        camPos.distanceTo(zPos) <
+                        CONFIG.swordRange
+                    ) {
+                        if (
+                            dir.dot(
+                                zPos.sub(camPos).normalize()
+                            ) > 0.15
+                        ) {
+                            showHitFeedback();
+                            spawnHitRing(zPos);
+
+                            if (isHost || !conn) {
+                                damageZulu(
+                                    zulus[i].id,
+                                    CONFIG.swordDamage,
+                                    zPos
+                                );
+                            } else {
+                                conn.send({
+                                    type: 'HIT_ZULU',
+                                    zuluId: zulus[i].id,
+                                    damage: CONFIG.swordDamage,
+                                    hitPos: {
+                                        x: zPos.x,
+                                        y: zPos.y,
+                                        z: zPos.z
+                                    }
+                                });
+                            }
+
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        document
+            .getElementById('btn-attack')
+            .addEventListener(
+                'click',
+                performAttack
+            );
+
+        document
+            .getElementById('btn-switch')
+            .addEventListener(
+                'click',
+                switchWeapon
+            );
+
+        window.addEventListener(
+            'mousedown',
+            (e) => {
+                if (
+                    e.button === 0 &&
+                    STATE.gameStarted &&
+                    document.pointerLockElement ===
+                        renderer.domElement
+                ) {
+                    performAttack();
+                }
+            }
+        );
+
+        let lastSpawn = 0;
+        const clock = new THREE.Clock();
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            if (!STATE.gameStarted) return;
+
+            const delta = clock.getDelta();
+            const time = clock.getElapsedTime();
+
+            updateGunSmoke(delta);
+            updateHitRings(delta);
+
+            if (!STATE.gameOver) {
+
+                if (!STATE.isDead) {
+
+                    player.rotation.y = yaw;
+                    cameraNode.rotation.x = pitch;
+
+                    let moveZ =
+                        input.forward +
+                        (keys['KeyW'] ||
+                        keys['ArrowUp'] ? 1 : 0) -
+                        (keys['KeyS'] ||
+                        keys['ArrowDown'] ? 1 : 0);
+
+                    let moveX =
+                        input.right +
+                        (keys['KeyD'] ||
+                        keys['ArrowRight'] ? 1 : 0) -
+                        (keys['KeyA'] ||
+                        keys['ArrowLeft'] ? 1 : 0);
+
+                    const moveDir =
+                        new THREE.Vector3(
+                            moveX,
+                            0,
+                            -moveZ
+                        ).normalize();
+
+                    STATE.isMoving =
+                        moveDir.lengthSq() > 0.01;
+
+                    if (STATE.isMoving) {
+                        moveDir.applyAxisAngle(
+                            new THREE.Vector3(0, 1, 0),
+                            yaw
+                        );
+
+                        const nextPos =
+                            player.position.clone()
+                                .addScaledVector(
+                                    moveDir,
+                                    0.1
+                                );
+
+                        if (!checkMountainCollision(nextPos)) {
+                            player.position.copy(nextPos);
+                        }
+                    }
+
+                    updateCharacterPose(
+                        playerModel,
+                        STATE.isMoving,
+                        STATE.weapon,
+                        time,
+                        delta
+                    );
+
+                    zulus.forEach(z => {
+                        const dx =
+                            player.position.x -
+                            z.group.position.x;
+
+                        const dz =
+                            player.position.z -
+                            z.group.position.z;
+
+                        if (
+                            dx * dx + dz * dz <
+                            2.25
+                        ) {
+                            STATE.hp -=
+                                CONFIG.zuluDamage *
+                                delta;
+
+                            document.getElementById(
+                                'hp-val'
+                            ).innerText =
+                                Math.max(
+                                    0,
+                                    Math.ceil(STATE.hp)
+                                );
+
+                            if (STATE.hp <= 0) {
+                                handlePlayerDeath();
+                            }
+                        }
+                    });
+                }
+
+                if (
+                    remotePlayerMesh &&
+                    remotePlayerMesh.visible
+                ) {
+                    updateCharacterPose(
+                        remotePlayerMesh,
+                        STATE.remoteIsMoving,
+                        STATE.remoteWeapon,
+                        time,
+                        delta
+                    );
+                }
+
+                if (STATE.reloading) {
+                    const elapsed =
+                        performance.now() -
+                        STATE.lastAttackTime;
+
+                    const progress =
+                        Math.min(
+                            elapsed /
+                                CONFIG.musketCooldown,
+                            1.0
+                        );
+
+                    document.getElementById(
+                        'reload-bar'
+                    ).style.width =
+                        `${progress * 100}%`;
+
+                    if (progress >= 1.0) {
+                        STATE.reloading = false;
+
+                        document.getElementById(
+                            'reload-bar-container'
+                        ).style.display = 'none';
+                    }
+                }
+
+                weaponNode.position.z +=
+                    (-0.5 - weaponNode.position.z) *
+                    0.12;
+
+                weaponNode.rotation.x +=
+                    (0 - weaponNode.rotation.x) *
+                    0.12;
+
+                if (STATE.weapon === 'sword') {
+                    swordGroup.rotation.z +=
+                        (0 - swordGroup.rotation.z) *
+                        0.15;
+                }
+
+                if (
+                    (isHost || !conn) &&
+                    STATE.waveActive &&
+                    STATE.zulusToSpawnInWave > 0 &&
+                    performance.now() - lastSpawn >
+                        CONFIG.baseSpawnInterval
+                ) {
+                    createZulu();
+
+                    STATE.zulusToSpawnInWave--;
+
+                    lastSpawn = performance.now();
+                }
+
+                if (isHost || !conn) {
+
+                    zulus.forEach((z) => {
+
+                        let targetPos =
+                            player.position;
+
+                        let minDist = Infinity;
+
+                        if (!STATE.isDead) {
+                            const dHost =
+                                z.group.position.distanceTo(
+                                    player.position
+                                );
+
+                            if (dHost < minDist) {
+                                minDist = dHost;
+                                targetPos =
+                                    player.position;
+                            }
+                        }
+
+                        if (
+                            conn &&
+                            conn.open &&
+                            !STATE.remoteIsDead
+                        ) {
+                            const dRemote =
+                                z.group.position.distanceTo(
+                                    remotePlayerMesh.position
+                                );
+
+                            if (dRemote < minDist) {
+                                minDist = dRemote;
+                                targetPos =
+                                    remotePlayerMesh.position;
+                            }
+                        }
+
+                        const dir =
+                            targetPos.clone().sub(
+                                z.group.position
+                            );
+
+                        dir.y = 0;
+
+                        let blockedByBarricade = false;
+
+                        for (let b of barricades) {
+
+                            if (!b.active) continue;
+
+                            const dx =
+                                z.group.position.x - b.x;
+
+                            const dz =
+                                z.group.position.z - b.z;
+
+                            if (
+                                dx * dx + dz * dz <
+                                1.44
+                            ) {
+                                blockedByBarricade = true;
+
+                                b.touchTimer += delta;
+
+                                if (b.touchTimer >= 3.0) {
+                                    b.active = false;
+                                    b.mesh.visible = false;
+                                }
+
+                                break;
+                            }
+                        }
+
+                        if (
+                            !blockedByBarricade &&
+                            dir.length() > 1.2
+                        ) {
+                            dir.normalize();
+
+                            z.group.position.addScaledVector(
+                                dir,
+                                CONFIG.baseSpeed
+                            );
+
+                            z.group.lookAt(
+                                z.group.position.x + dir.x,
+                                z.group.position.y,
+                                z.group.position.z + dir.z
+                            );
+
+                            z.group.rotation.z =
+                                Math.sin(
+                                    time * 12 +
+                                    z.animOffset
+                                ) * 0.08;
+                        }
+                    });
+                }
+
+                if (conn && conn.open) {
+                    if (
+                        STATE.isDead &&
+                        STATE.remoteIsDead
+                    ) {
+                        triggerGameOver();
+                    }
+                } else {
+                    if (STATE.isDead) {
+                        triggerGameOver();
+                    }
+                }
+            }
+
+            renderer.render(
+                scene,
+                camera
+            );
+        }
+              function handlePlayerDeath() {
+            STATE.isDead = true;
+
+            document.getElementById('hp-val').innerText = 0;
+            document.getElementById('spectator-msg').style.display = 'block';
+
+            playerModel.visible = false;
+            weaponNode.visible = false;
+
+            if (document.exitPointerLock) {
+                document.exitPointerLock();
+            }
+
+            if (conn && conn.open && !STATE.remoteIsDead) {
+                remotePlayerMesh.add(cameraNode);
+
+                cameraNode.position.set(
+                    0,
+                    3,
+                    5
+                );
+
+                cameraNode.rotation.x = -0.3;
+            }
+        }
+
+        function triggerGameOver() {
+            STATE.gameOver = true;
+
+            if (document.exitPointerLock) {
+                document.exitPointerLock();
+            }
+
+            document.getElementById(
+                'spectator-msg'
+            ).style.display = 'none';
+
+            document.getElementById(
+                'final-wave'
+            ).innerText = STATE.wave;
+
+            document.getElementById(
+                'final-score'
+            ).innerText = STATE.score;
+
+            document.getElementById(
+                'game-over'
+            ).style.display = 'flex';
+        }
+
+        function resetGame() {
+            zulus.forEach(z => {
+                scene.remove(z.group);
+            });
+
+            zulus.length = 0;
+
+            STATE.hp = 100;
+            STATE.score = 0;
+            STATE.gameOver = false;
+            STATE.isDead = false;
+            STATE.reloading = false;
+
+            player.add(cameraNode);
+
+            cameraNode.position.set(
+                0,
+                1.58,
+                0
+            );
+
+            cameraNode.rotation.set(
+                0,
+                0,
+                0
+            );
+
+            player.position.set(
+                0,
+                0,
+                0
+            );
+
+            document.getElementById(
+                'hp-val'
+            ).innerText = 100;
+
+            document.getElementById(
+                'score-val'
+            ).innerText = 0;
+
+            document.getElementById(
+                'spectator-msg'
+            ).style.display = 'none';
+
+            document.getElementById(
+                'game-over'
+            ).style.display = 'none';
+
+            resetBarricades();
+
+            setCameraMode(
+                STATE.cameraMode
+            );
+
+            if (isHost || !conn) {
+                startWave(1);
+            }
+        }
+
+        animate();
+    </script>
+</body>
+</html>
