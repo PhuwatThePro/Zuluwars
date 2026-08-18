@@ -113,6 +113,7 @@ html,body{width:100%;height:100%;overflow:hidden;touch-action:none;background:#0
             weapon: 'musket',
             reloading: false,
             lastAttackTime: 0,
+            musketReloadUntil: 0,
             gameOver: false,
             isDead: false,
             remoteIsDead: false,
@@ -135,7 +136,10 @@ html,body{width:100%;height:100%;overflow:hidden;touch-action:none;background:#0
             baseSpeed: 0.10,
             baseSpawnInterval: 2200,
             zuluDamage: 36,
-            swordDamage: 1
+            swordDamage: 1,
+            zuluStopDistance: 3.2,
+            zuluAttackRange: 3.8,
+            zuluAttackCooldown: 1.0
         };
 
         let peer = null;
@@ -1107,7 +1111,7 @@ html,body{width:100%;height:100%;overflow:hidden;touch-action:none;background:#0
             group.position.set(posX, 0, posZ);
             scene.add(group);
 
-            const zObj = { id: zId, group: group, headHitbox: headHitbox, bodyHitbox: bodyHitbox, hp: 2, animOffset: Math.random() * 10 };
+            const zObj = { id: zId, group: group, headHitbox: headHitbox, bodyHitbox: bodyHitbox, hp: 2, animOffset: Math.random() * 10, attackTimer: 0 };
             zulus.push(zObj);
             return zObj;
         }
@@ -1178,29 +1182,42 @@ html,body{width:100%;height:100%;overflow:hidden;touch-action:none;background:#0
         function switchWeapon() {
             if (STATE.isDead || STATE.gameOver || !STATE.gameStarted) return;
 
-            // Switching away from the musket instantly cancels and resets reload.
-            STATE.reloading = false;
-            STATE.lastAttackTime = 0;
-
-            const reloadContainer = document.getElementById('reload-bar-container');
-            const reloadBar = document.getElementById('reload-bar');
-            if (reloadContainer) reloadContainer.style.display = 'none';
-            if (reloadBar) reloadBar.style.width = '0%';
-
-            weaponNode.position.z = -0.5;
-            weaponNode.rotation.x = 0;
-
+            const now = performance.now();
             STATE.weapon = STATE.weapon === 'musket' ? 'sword' : 'musket';
 
             musketGroup.visible = (STATE.weapon === 'musket');
             swordGroup.visible = (STATE.weapon === 'sword');
+            weaponNode.position.z = -0.5;
+            weaponNode.rotation.x = 0;
+
+            const reloadContainer = document.getElementById('reload-bar-container');
+            const reloadBar = document.getElementById('reload-bar');
+
+            if (STATE.weapon === 'sword') {
+                // Hide the UI while keeping the real reload deadline.
+                reloadContainer.style.display = 'none';
+                reloadBar.style.width = '0%';
+                STATE.reloading = STATE.musketReloadUntil > now;
+                document.getElementById('ammo-val').innerText = 'MELEE';
+            } else {
+                const remaining = Math.max(0, STATE.musketReloadUntil - now);
+                if (remaining > 0) {
+                    STATE.reloading = true;
+                    STATE.lastAttackTime = now - (CONFIG.musketCooldown - remaining);
+                    reloadContainer.style.display = 'block';
+                    document.getElementById('ammo-val').innerText = 'RELOADING';
+                } else {
+                    STATE.reloading = false;
+                    STATE.lastAttackTime = 0;
+                    reloadContainer.style.display = 'none';
+                    reloadBar.style.width = '0%';
+                    document.getElementById('ammo-val').innerText = 'READY';
+                }
+            }
 
             document.getElementById('weapon-val').innerText =
                 (STATE.weapon === 'musket') ? 'MUSKET' : 'SWORD';
-
-            if (STATE.weapon === 'musket') {
-                document.getElementById('ammo-val').innerText = 'READY';
-            }
+            updateMusketCrosshair();
         }
 
         function updateMusketCrosshair() {
@@ -1256,7 +1273,9 @@ html,body{width:100%;height:100%;overflow:hidden;touch-action:none;background:#0
                 if (STATE.reloading) return;
                 STATE.reloading = true;
                 STATE.lastAttackTime = now;
+                STATE.musketReloadUntil = now + CONFIG.musketCooldown;
                 document.getElementById('reload-bar-container').style.display = 'block';
+                document.getElementById('ammo-val').innerText = 'RELOADING';
 
                 weaponNode.position.z += 0.25;
                 weaponNode.rotation.x += 0.25;
@@ -1375,8 +1394,20 @@ html,body{width:100%;height:100%;overflow:hidden;touch-action:none;background:#0
                     zulus.forEach(z => {
                         const dx = player.position.x - z.group.position.x;
                         const dz = player.position.z - z.group.position.z;
-                        if (dx * dx + dz * dz < 2.25) {
-                            STATE.hp -= CONFIG.zuluDamage * delta;
+                        const dist = Math.sqrt(dx * dx + dz * dz);
+                        z.attackTimer = Math.max(0, (z.attackTimer || 0) - delta);
+
+                        if (dist < CONFIG.zuluStopDistance) {
+                            // Keep the enemy outside the player's body/camera space.
+                            const safeDist = CONFIG.zuluStopDistance;
+                            const inv = dist > 0.001 ? 1 / dist : 1;
+                            z.group.position.x = player.position.x - dx * inv * safeDist;
+                            z.group.position.z = player.position.z - dz * inv * safeDist;
+                        }
+
+                        if (dist <= CONFIG.zuluAttackRange && z.attackTimer <= 0) {
+                            STATE.hp -= CONFIG.zuluDamage;
+                            z.attackTimer = CONFIG.zuluAttackCooldown;
                             document.getElementById('hp-val').innerText = Math.max(0, Math.ceil(STATE.hp));
                             if (STATE.hp <= 0) handlePlayerDeath();
                         }
@@ -1389,15 +1420,27 @@ html,body{width:100%;height:100%;overflow:hidden;touch-action:none;background:#0
                 }
 
                 if (STATE.reloading) {
-                    const elapsed = performance.now() - STATE.lastAttackTime;
+                    const nowReload = performance.now();
+                    const elapsed = nowReload - STATE.lastAttackTime;
                     const progress = Math.min(elapsed / CONFIG.musketCooldown, 1.0);
                     document.getElementById('reload-bar').style.width = `${progress * 100}%`;
                     if (progress >= 1.0) {
                         STATE.reloading = false;
+                        STATE.musketReloadUntil = 0;
                         document.getElementById('reload-bar-container').style.display = 'none';
                         document.getElementById('reload-bar').style.width = '0%';
+                        document.getElementById('ammo-val').innerText = 'READY';
                         weaponNode.position.z = -0.5;
                         weaponNode.rotation.x = 0;
+                    }
+
+                    // When the sword is equipped, the reload timer still runs in the background.
+                    if (STATE.weapon === 'sword') {
+                        const left = Math.max(0, STATE.musketReloadUntil - nowReload);
+                        if (left <= 0) {
+                            STATE.reloading = false;
+                            STATE.musketReloadUntil = 0;
+                        }
                     }
                 }
 
@@ -1446,7 +1489,7 @@ html,body{width:100%;height:100%;overflow:hidden;touch-action:none;background:#0
                             }
                         }
 
-                        if (!blockedByBarricade && dir.length() > 1.2) {
+                        if (!blockedByBarricade && dir.length() > CONFIG.zuluStopDistance) {
                             dir.normalize();
                             z.group.position.addScaledVector(dir, CONFIG.baseSpeed);
                             z.group.lookAt(z.group.position.x + dir.x, z.group.position.y, z.group.position.z + dir.z);
@@ -1491,7 +1534,7 @@ html,body{width:100%;height:100%;overflow:hidden;touch-action:none;background:#0
         function resetGame() {
             zulus.forEach(z => scene.remove(z.group));
             zulus.length = 0;
-            STATE.hp = 100; STATE.score = 0; STATE.gameOver = false; STATE.isDead = false; STATE.reloading = false;
+            STATE.hp = 100; STATE.score = 0; STATE.gameOver = false; STATE.isDead = false; STATE.reloading = false; STATE.musketReloadUntil = 0;
             
             player.add(cameraNode);
             cameraNode.position.set(0, 1.58, 0);
