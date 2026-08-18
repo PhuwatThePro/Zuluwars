@@ -160,7 +160,7 @@
             swordRange: 5.5,
             baseSpeed: 0.08,
             baseSpawnInterval: 2200,
-            zuluDamage: 10,
+            zuluDamage: 18,
             musketDamage: 2,
             swordDamage: 1
         };
@@ -532,6 +532,13 @@
                     if (isHost) {
                         damageZulu(data.zuluId, data.damage);
                     }
+                } else if (data.type === 'DAMAGE_CLIENT') {
+                    // Client damaged by Host Zulu calculation
+                    if (!isHost && !STATE.isDead) {
+                        STATE.hp -= data.damage;
+                        document.getElementById('hp-val').innerText = Math.max(0, Math.ceil(STATE.hp));
+                        if (STATE.hp <= 0) handlePlayerDeath();
+                    }
                 }
             });
         }
@@ -586,7 +593,7 @@
             const hitMesh = new THREE.Mesh(new THREE.SphereGeometry(1.2), new THREE.MeshBasicMaterial({ visible: false }));
             hitMesh.position.y = 1.2; group.add(hitMesh);
 
-            const zId = id || zuluIdCounter++;
+            const zId = id !== null ? id : zuluIdCounter++;
             const posX = x !== null ? x : (Math.random() - 0.5) * 36;
             const posZ = z !== null ? z : (-45 - Math.random() * 10);
 
@@ -798,8 +805,18 @@
                 if (isHost || !conn) {
                     zulus.forEach((z) => {
                         let targetPos = player.position;
-                        if (conn && conn.open && !STATE.remoteIsDead && (STATE.isDead || z.id % 2 === 0)) {
-                            targetPos = remotePlayerMesh.position;
+                        let isTargetingClient = false;
+
+                        if (conn && conn.open) {
+                            if (STATE.isDead && !STATE.remoteIsDead) {
+                                targetPos = remotePlayerMesh.position;
+                                isTargetingClient = true;
+                            } else if (!STATE.isDead && !STATE.remoteIsDead) {
+                                if (z.id % 2 === 0) {
+                                    targetPos = remotePlayerMesh.position;
+                                    isTargetingClient = true;
+                                }
+                            }
                         }
 
                         const dir = targetPos.clone().sub(z.group.position); dir.y = 0;
@@ -808,8 +825,11 @@
                             z.group.lookAt(z.group.position.x + dir.x, z.group.position.y, z.group.position.z + dir.z);
                             z.group.rotation.z = Math.sin(time * 12 + z.animOffset) * 0.08;
                         } else {
-                            if (targetPos === player.position && !STATE.isDead) {
-                                STATE.hp -= CONFIG.zuluDamage * delta;
+                            const damageDealt = CONFIG.zuluDamage * delta;
+                            if (isTargetingClient && conn && conn.open) {
+                                conn.send({ type: 'DAMAGE_CLIENT', damage: damageDealt });
+                            } else if (!STATE.isDead) {
+                                STATE.hp -= damageDealt;
                                 document.getElementById('hp-val').innerText = Math.max(0, Math.ceil(STATE.hp));
                                 if (STATE.hp <= 0) handlePlayerDeath();
                             }
@@ -836,7 +856,6 @@
             if (document.exitPointerLock) document.exitPointerLock();
 
             if (conn && conn.open && !STATE.remoteIsDead) {
-                // Attach camera elevated behind remote player for spectating
                 remotePlayerMesh.add(cameraNode);
                 cameraNode.position.set(0, 3, 5);
                 cameraNode.rotation.x = -0.3;
