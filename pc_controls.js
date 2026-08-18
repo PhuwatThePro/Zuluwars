@@ -9,8 +9,6 @@
       if (d.__ZULU_PC_CONTROLS) return;
       d.__ZULU_PC_CONTROLS = true;
 
-      const w = d.defaultView;
-
       const patch = d.createElement('script');
       patch.textContent = `
 (function(){
@@ -52,25 +50,11 @@
     }
   };
 
-  // Q/E keyboard switching uses the patched function.
-  window.addEventListener('keydown', function(e){
-    if(e.code === 'KeyQ' || e.code === 'KeyE'){
-      e.preventDefault();
-      window.switchWeapon();
-    }
-  }, true);
-
-  // PC mouse look + pointer lock.
+  // PC left click: fire immediately. The game's existing mousemove and
+  // Q/E handlers are left untouched so camera sensitivity and switching
+  // are not duplicated.
   var canvas = document.querySelector('#canvas-container canvas');
   if(canvas){
-    canvas.addEventListener('click', function(){
-      if(typeof STATE !== 'undefined' && STATE.gameStarted && !STATE.settingsOpen && !STATE.gameOver && !STATE.isDead){
-        if(document.pointerLockElement !== canvas && canvas.requestPointerLock){
-          canvas.requestPointerLock();
-        }
-      }
-    });
-
     canvas.addEventListener('mousedown', function(e){
       if(e.button !== 0) return;
       if(typeof STATE === 'undefined') return;
@@ -86,22 +70,7 @@
     });
   }
 
-  // Mouse movement rotates the camera only while pointer-locked.
-  document.addEventListener('mousemove', function(e){
-    if(typeof STATE === 'undefined') return;
-    var activeCanvas = document.querySelector('#canvas-container canvas');
-    if(!activeCanvas) return;
-    if(document.pointerLockElement !== activeCanvas) return;
-    if(!STATE.gameStarted || STATE.settingsOpen || STATE.gameOver || STATE.isDead) return;
-
-    if(typeof yaw !== 'undefined' && typeof pitch !== 'undefined'){
-      yaw -= e.movementX * 0.0025;
-      pitch -= e.movementY * 0.0025;
-      pitch = Math.max(-Math.PI / 2.3, Math.min(Math.PI / 2.3, pitch));
-    }
-  });
-
-  // Warband-style separated crosshair for ranged weapon.
+  // Warband-style separated crosshair.
   var style = document.createElement('style');
   style.textContent = `
 #crosshair{width:46px!important;height:46px!important;--gap:7px!important}
