@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>1879 Frontier Defense - Mountain Pass v1.3.0</title>
+    <title>1879 Frontier Defense - Mountain Pass v1.3.1</title>
     <style>
         * { box-sizing: border-box; user-select: none; -webkit-user-select: none; margin: 0; padding: 0; }
         body, html { 
@@ -86,7 +86,7 @@
                 <div style="font-size: 10px; color: #88ff88; margin-top: 4px;" id="network-status">OFFLINE</div>
             </div>
             <div id="hud-center">
-                <span class="version-badge">v1.3.0</span>
+                <span class="version-badge">v1.3.1</span>
                 <button class="icon-btn" onclick="toggleSettings()">⚙ SETTINGS</button>
                 <div id="room-code-badge">ROOM CODE: <span id="room-code-val">----</span></div>
             </div>
@@ -150,7 +150,7 @@
     </div>
 
     <script>
-        const GAME_VERSION = "v1.3.0";
+        const GAME_VERSION = "v1.3.1";
 
         const STATE = {
             hp: 100,
@@ -167,16 +167,19 @@
             waveActive: false,
             cameraMode: '1P',
             settingsOpen: false,
-            gameStarted: false
+            gameStarted: false,
+            isMoving: false,
+            remoteIsMoving: false,
+            remoteWeapon: 'musket'
         };
 
         const CONFIG = {
-            musketCooldown: 2700, // 1.5x reload time
+            musketCooldown: 2700,
             swordCooldown: 800,
             swordRange: 5.5,
-            baseSpeed: 0.10, // Match player speed
+            baseSpeed: 0.10,
             baseSpawnInterval: 2200,
-            zuluDamage: 36,   // 2x attack damage
+            zuluDamage: 36,
             swordDamage: 1
         };
 
@@ -186,6 +189,7 @@
         let playerName = "Soldier";
         let remotePlayerName = "Comrade";
         let remotePlayerMesh = null;
+        let prevRemotePos = new THREE.Vector3();
         let zuluIdCounter = 0;
 
         const container = document.getElementById('canvas-container');
@@ -374,7 +378,7 @@
             return sprite;
         }
 
-        // Character Models & Weapon Attachment
+        // Character Materials
         const tunicMat = new THREE.MeshStandardMaterial({ color: 0xa81c1c, roughness: 0.7 }); 
         const pantsMat = new THREE.MeshStandardMaterial({ color: 0x1c2738, roughness: 0.8 }); 
         const helmetMat = new THREE.MeshStandardMaterial({ color: 0xeee8dc, roughness: 0.5 }); 
@@ -383,6 +387,7 @@
         const bootMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.9 });
         const ironMat = new THREE.MeshStandardMaterial({ color: 0x222222, metalness: 0.8 });
 
+        // Character Mesh Generator with Articulated Joint Pivots
         function createSoldierMesh() {
             const pModel = new THREE.Group();
             
@@ -406,53 +411,124 @@
             helmetBrim.position.y = 1.58;
             pModel.add(helmetDome, helmetBrim);
 
-            // Legs
-            const leftLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.11, 0.75), pantsMat);
-            leftLeg.position.set(-0.18, 0.4, 0);
-            const rightLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.11, 0.75), pantsMat);
-            rightLeg.position.set(0.18, 0.4, 0);
-            pModel.add(leftLeg, rightLeg);
+            // --- LEGS (Pivoted at hips) ---
+            const leftLegPivot = new THREE.Group();
+            leftLegPivot.position.set(-0.18, 0.65, 0);
+            const leftLegMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.10, 0.65), pantsMat);
+            leftLegMesh.position.y = -0.325;
+            const leftBoot = new THREE.Mesh(new THREE.CylinderGeometry(0.10, 0.11, 0.20), bootMat);
+            leftBoot.position.set(0, -0.55, 0.03);
+            leftLegPivot.add(leftLegMesh, leftBoot);
+            pModel.add(leftLegPivot);
 
-            const leftBoot = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.12, 0.25), bootMat);
-            leftBoot.position.set(-0.18, 0.12, 0);
-            const rightBoot = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.12, 0.25), bootMat);
-            rightBoot.position.set(0.18, 0.12, 0);
-            pModel.add(leftBoot, rightBoot);
+            const rightLegPivot = new THREE.Group();
+            rightLegPivot.position.set(0.18, 0.65, 0);
+            const rightLegMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.10, 0.65), pantsMat);
+            rightLegMesh.position.y = -0.325;
+            const rightBoot = new THREE.Mesh(new THREE.CylinderGeometry(0.10, 0.11, 0.20), bootMat);
+            rightBoot.position.set(0, -0.55, 0.03);
+            rightLegPivot.add(rightLegMesh, rightBoot);
+            pModel.add(rightLegPivot);
 
-            // 3rd Person Arms & Weapon Attachment Group
-            const leftArm = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.09, 0.75), tunicMat);
-            leftArm.position.set(-0.42, 1.0, 0.15);
-            leftArm.rotation.x = -Math.PI / 4;
-            pModel.add(leftArm);
+            // --- ARMS (Pivoted at shoulders) ---
+            const leftArmPivot = new THREE.Group();
+            leftArmPivot.position.set(-0.38, 1.30, 0);
+            const leftArmMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.08, 0.65), tunicMat);
+            leftArmMesh.position.y = -0.325;
+            const leftHand = new THREE.Mesh(new THREE.SphereGeometry(0.08, 6, 6), skinMat);
+            leftHand.position.y = -0.62;
+            leftArmPivot.add(leftArmMesh, leftHand);
+            pModel.add(leftArmPivot);
 
-            const rightArm = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.09, 0.75), tunicMat);
-            rightArm.position.set(0.42, 1.0, 0.15);
-            rightArm.rotation.x = -Math.PI / 3;
-            pModel.add(rightArm);
+            const rightArmPivot = new THREE.Group();
+            rightArmPivot.position.set(0.38, 1.30, 0);
+            const rightArmMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.08, 0.65), tunicMat);
+            rightArmMesh.position.y = -0.325;
+            const rightHand = new THREE.Mesh(new THREE.SphereGeometry(0.08, 6, 6), skinMat);
+            rightHand.position.y = -0.62;
+            rightArmPivot.add(rightArmMesh, rightHand);
+            pModel.add(rightArmPivot);
 
-            // 3P Gun Mesh
+            // --- WEAPONS MOUNTED TO HAND PIVOTS ---
+            // 3P Musket
             const tpMusket = new THREE.Group();
             const tpStock = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.12, 1.2), new THREE.MeshStandardMaterial({ color: 0x4a2e11 }));
             const tpBarrel = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 1.4), ironMat);
             tpBarrel.rotation.x = Math.PI / 2; tpBarrel.position.set(0, 0.05, -0.3);
             tpMusket.add(tpStock, tpBarrel);
-            tpMusket.position.set(0.25, 0.85, -0.4);
-            tpMusket.rotation.x = -Math.PI / 12;
-            pModel.add(tpMusket);
+            tpMusket.position.set(0, -0.58, -0.25);
+            rightArmPivot.add(tpMusket);
 
-            // 3P Sword Mesh
+            // 3P Sword
             const tpSword = new THREE.Group();
             const tpBlade = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.9, 0.01), new THREE.MeshStandardMaterial({ color: 0xeeeeee, metalness: 0.95 }));
             tpBlade.position.set(0, 0.45, 0);
-            tpSword.add(tpBlade);
-            tpSword.position.set(0.3, 0.7, -0.2);
-            tpSword.rotation.x = -Math.PI / 3;
+            const tpHilt = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.04, 0.06), ironMat);
+            tpHilt.position.set(0, 0.02, 0);
+            tpSword.add(tpBlade, tpHilt);
+            tpSword.position.set(0, -0.58, -0.1);
+            tpSword.rotation.set(-Math.PI / 2, 0, 0);
             tpSword.visible = false;
-            pModel.add(tpSword);
+            rightArmPivot.add(tpSword);
 
-            pModel.userData = { musket: tpMusket, sword: tpSword };
+            pModel.userData = { 
+                musket: tpMusket, 
+                sword: tpSword,
+                leftArm: leftArmPivot,
+                rightArm: rightArmPivot,
+                leftLeg: leftLegPivot,
+                rightLeg: rightLegPivot
+            };
 
             return pModel;
+        }
+
+        // Dynamic Posture & Walking Animation Controller
+        function updateCharacterPose(model, isMoving, weapon, time, delta) {
+            const data = model.userData;
+            if (!data.leftArm || !data.rightArm) return;
+
+            const lArm = data.leftArm;
+            const rArm = data.rightArm;
+            const lLeg = data.leftLeg;
+            const rLeg = data.rightLeg;
+
+            // 1. Weapon Holding Arm Positions
+            if (weapon === 'musket') {
+                data.musket.visible = true;
+                data.sword.visible = false;
+
+                // Two-handed rifle stance
+                rArm.rotation.set(-1.1, -0.35, -0.15);
+                lArm.rotation.set(-1.25, 0.55, 0.35);
+                data.musket.rotation.set(Math.PI / 2, 0, -0.1);
+            } else {
+                data.musket.visible = false;
+                data.sword.visible = true;
+
+                // Sword ready stance
+                rArm.rotation.set(-0.65, 0.15, 0.0);
+                lArm.rotation.set(0, 0, 0.15);
+            }
+
+            // 2. Walking Leg & Body Animation
+            if (isMoving) {
+                const walkCycle = Math.sin(time * 11);
+                lLeg.rotation.x = walkCycle * 0.60;
+                rLeg.rotation.x = -walkCycle * 0.60;
+
+                // Slight walk sway for arms
+                if (weapon === 'musket') {
+                    rArm.rotation.x += Math.sin(time * 11) * 0.05;
+                    lArm.rotation.x += Math.sin(time * 11) * 0.05;
+                } else {
+                    lArm.rotation.x = -walkCycle * 0.50; // Swing free arm
+                }
+            } else {
+                // Return legs to neutral standing position
+                lLeg.rotation.x += (0 - lLeg.rotation.x) * 12 * delta;
+                rLeg.rotation.x += (0 - rLeg.rotation.x) * 12 * delta;
+            }
         }
 
         const player = new THREE.Group();
@@ -714,13 +790,9 @@
                     remotePlayerMesh.position.set(data.x, data.y, data.z);
                     remotePlayerMesh.rotation.y = data.yaw;
                     STATE.remoteIsDead = data.isDead;
+                    STATE.remoteIsMoving = data.isMoving;
+                    STATE.remoteWeapon = data.equippedWeapon;
                     remotePlayerMesh.visible = !data.isDead;
-
-                    // Sync remote player weapon visuals
-                    if (remotePlayerMesh.userData.musket && remotePlayerMesh.userData.sword) {
-                        remotePlayerMesh.userData.musket.visible = (data.equippedWeapon === 'musket');
-                        remotePlayerMesh.userData.sword.visible = (data.equippedWeapon === 'sword');
-                    }
 
                     if (!isHost && data.zulus) {
                         syncZulusFromHost(data.zulus);
@@ -757,6 +829,7 @@
                     z: player.position.z,
                     yaw: yaw,
                     isDead: STATE.isDead,
+                    isMoving: STATE.isMoving,
                     equippedWeapon: STATE.weapon
                 };
 
@@ -893,12 +966,6 @@
             // FP visual update
             musketGroup.visible = (STATE.weapon === 'musket');
             swordGroup.visible = (STATE.weapon === 'sword');
-
-            // TP visual update
-            if (playerModel.userData.musket && playerModel.userData.sword) {
-                playerModel.userData.musket.visible = (STATE.weapon === 'musket');
-                playerModel.userData.sword.visible = (STATE.weapon === 'sword');
-            }
 
             document.getElementById('weapon-val').innerText = (STATE.weapon === 'musket') ? 'MARTINI-HENRY' : 'SWORD';
         }
@@ -1040,13 +1107,18 @@
                     let moveX = input.right + (keys['KeyD'] || keys['ArrowRight'] ? 1 : 0) - (keys['KeyA'] || keys['ArrowLeft'] ? 1 : 0);
                     
                     const moveDir = new THREE.Vector3(moveX, 0, -moveZ).normalize();
-                    if (moveDir.length() > 0) {
+                    STATE.isMoving = (moveDir.lengthSq() > 0.01);
+
+                    if (STATE.isMoving) {
                         moveDir.applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
                         const nextPos = player.position.clone().addScaledVector(moveDir, 0.1);
                         if (!checkMountainCollision(nextPos)) player.position.copy(nextPos);
                     }
 
-                    // Zulu Player Damage Logic (2x rate)
+                    // Update Local 3rd Person Animations
+                    updateCharacterPose(playerModel, STATE.isMoving, STATE.weapon, time, delta);
+
+                    // Zulu Player Damage Logic
                     zulus.forEach(z => {
                         const dx = player.position.x - z.group.position.x;
                         const dz = player.position.z - z.group.position.z;
@@ -1056,6 +1128,11 @@
                             if (STATE.hp <= 0) handlePlayerDeath();
                         }
                     });
+                }
+
+                // Update Remote Player Animations
+                if (remotePlayerMesh && remotePlayerMesh.visible) {
+                    updateCharacterPose(remotePlayerMesh, STATE.remoteIsMoving, STATE.remoteWeapon, time, delta);
                 }
 
                 if (STATE.reloading) {
