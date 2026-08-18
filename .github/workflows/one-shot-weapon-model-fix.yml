@@ -1,8 +1,6 @@
 name: One-shot weapon model fix
 on:
   push:
-    paths:
-      - '.github/workflows/one-shot-weapon-model-fix.yml'
 permissions:
   contents: write
 jobs:
@@ -20,25 +18,26 @@ jobs:
           old = '''            const spearShaft = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 2.2), new THREE.MeshStandardMaterial({ color: 0x4a2e11 }));
             spearShaft.rotation.x = Math.PI / 2; spearShaft.position.set(0.4, 1.2, 0.4); group.add(spearShaft);
 '''
-          new = '''            // Long spear matched to the Zulu attack range.
+          new = '''            // Long Zulu spear matched to the 3.2 unit stop / 3.8 unit attack range.
             const spearWoodMat = new THREE.MeshStandardMaterial({ color: 0x4a2e11, roughness: 0.88 });
             const spearSteelMat = new THREE.MeshStandardMaterial({ color: 0xbfc4c4, metalness: 0.9, roughness: 0.22 });
 
             const spearShaft = new THREE.Mesh(
-                new THREE.CylinderGeometry(0.023, 0.028, 3.0, 8),
+                new THREE.CylinderGeometry(0.023, 0.028, 3.6, 8),
                 spearWoodMat
             );
+            // Zulu faces are toward local -Z, so the spear projects forward.
             spearShaft.rotation.x = Math.PI / 2;
-            spearShaft.position.set(0.4, 1.2, 0.55);
+            spearShaft.position.set(0.4, 1.2, -0.90);
             group.add(spearShaft);
 
-            // Sharp steel assegai-style spearhead.
+            // Sharp steel spearhead / assegai tip.
             const spearHead = new THREE.Mesh(
-                new THREE.ConeGeometry(0.11, 0.52, 6),
+                new THREE.ConeGeometry(0.12, 0.55, 6),
                 spearSteelMat
             );
-            spearHead.rotation.x = Math.PI / 2;
-            spearHead.position.set(0.4, 1.2, 2.30);
+            spearHead.rotation.x = -Math.PI / 2;
+            spearHead.position.set(0.4, 1.2, -2.95);
             group.add(spearHead);
 '''
           if old not in s: raise SystemExit('spear block not found')
@@ -65,7 +64,7 @@ jobs:
             tpSword.visible = false;
             pModel.add(tpSword);
 '''
-          new = '''            // Proper military-style sword: tapered blade, fuller, guard, grip and pommel.
+          new = '''            // Improved military-style sword: blade, fuller, guard, grip and pommel.
             const tpSword = new THREE.Group();
 
             const tpBlade = new THREE.Mesh(
@@ -78,10 +77,11 @@ jobs:
                 new THREE.ConeGeometry(0.055, 0.28, 4),
                 swordMat
             );
+            tpBladeTip.rotation.z = Math.PI / 4;
             tpBladeTip.position.set(0, 0.96, 0);
 
             const tpFuller = new THREE.Mesh(
-                new THREE.BoxGeometry(0.022, 0.55, 0.038),
+                new THREE.BoxGeometry(0.022, 0.56, 0.038),
                 ironMat
             );
             tpFuller.position.set(0, 0.48, -0.018);
@@ -110,42 +110,73 @@ jobs:
             tpSword.visible = false;
             pModel.add(tpSword);
 '''
-          if old not in s: raise SystemExit('sword block not found')
+          if old not in s: raise SystemExit('third-person sword block not found')
+          s = s.replace(old, new, 1)
+
+          old = '''        const swordGroup = new THREE.Group();
+        const swordBlade = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.9, 0.01), new THREE.MeshStandardMaterial({ color: 0xeeeeee, metalness: 0.95 }));
+        swordBlade.position.set(0, 0.45, 0);
+        swordGroup.add(swordBlade);
+        swordGroup.rotation.x = -Math.PI / 3; swordGroup.position.set(0, -0.1, -0.2);
+        swordGroup.visible = false;
+        weaponNode.add(swordGroup);
+'''
+          new = '''        const swordGroup = new THREE.Group();
+        const fpSwordMat = new THREE.MeshStandardMaterial({ color: 0xd8dadd, metalness: 0.95, roughness: 0.22 });
+        const fpGuardMat = new THREE.MeshStandardMaterial({ color: 0x4b5050, metalness: 0.82, roughness: 0.32 });
+        const fpGripMat = new THREE.MeshStandardMaterial({ color: 0x4a2e20, roughness: 0.9 });
+
+        const swordBlade = new THREE.Mesh(new THREE.BoxGeometry(0.055, 0.84, 0.025), fpSwordMat);
+        swordBlade.position.set(0, 0.50, 0);
+
+        const swordTip = new THREE.Mesh(new THREE.ConeGeometry(0.040, 0.24, 4), fpSwordMat);
+        swordTip.rotation.z = Math.PI / 4;
+        swordTip.position.set(0, 1.04, 0);
+
+        const swordFuller = new THREE.Mesh(new THREE.BoxGeometry(0.018, 0.60, 0.032), fpGuardMat);
+        swordFuller.position.set(0, 0.51, -0.015);
+
+        const swordGuard = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.05, 0.07), fpGuardMat);
+        swordGuard.position.y = 0.06;
+
+        const swordGrip = new THREE.Mesh(new THREE.CylinderGeometry(0.032, 0.037, 0.24, 8), fpGripMat);
+        swordGrip.position.y = -0.095;
+
+        const swordPommel = new THREE.Mesh(new THREE.SphereGeometry(0.045, 8, 6), fpGuardMat);
+        swordPommel.position.y = -0.245;
+
+        swordGroup.add(swordBlade, swordTip, swordFuller, swordGuard, swordGrip, swordPommel);
+        swordGroup.rotation.x = -Math.PI / 3;
+        swordGroup.position.set(0, -0.1, -0.2);
+        swordGroup.visible = false;
+        weaponNode.add(swordGroup);
+'''
+          if old not in s: raise SystemExit('first-person sword block not found')
           s = s.replace(old, new, 1)
 
           old = '''                data.musket.position.set(0.02, 0.92, -0.33);
                 data.musket.rotation.set(0, 0, -0.43);
 
             } else {'''
-          new = '''                // Forward-facing firing pose: local +Y points toward the soldier's -Z front.
-                if (STATE.weapon === 'musket' && STATE.reloading && model === playerModel) {
-                    // While reloading, lower and cant the musket across the chest.
-                    data.musket.position.set(0.02, 0.94, -0.18);
-                    data.musket.rotation.set(-1.02, 0, -0.34);
+          new = '''                // Loaded/carry-ready: muzzle points toward the soldier's forward -Z.
+                // During reload, lower the musket across the chest and return afterward.
+                if (model === playerModel && STATE.reloading) {
+                    data.musket.position.set(0.03, 0.93, -0.20);
+                    data.musket.rotation.set(-0.78, 0, -0.30);
                 } else {
-                    // Loaded/carry-ready pose: muzzle points directly toward the enemy/front.
-                    data.musket.position.set(0.02, 0.99, -0.34);
-                    data.musket.rotation.set(-1.30, 0, -0.10);
+                    data.musket.position.set(0.02, 0.98, -0.33);
+                    data.musket.rotation.set(-Math.PI / 2, 0, -0.08);
                 }
 
             } else {'''
           if old not in s: raise SystemExit('musket pose block not found')
           s = s.replace(old, new, 1)
 
-          old = '''            if (weapon === 'musket') {
-                data.musket.visible = true;
-                data.sword.visible = false;
-'''
-          new = '''            if (weapon === 'musket') {
-                data.musket.visible = true;
-                data.sword.visible = false;
-'''
-          # Deliberately no-op; keeps exact matching simple.
-
           p.write_text(s, encoding='utf-8')
           assert 'spearSteelMat' in s
           assert 'tpBladeTip' in s
-          assert 'Loaded/carry-ready pose' in s
+          assert 'first-person sword block not found' not in s
+          assert 'Math.PI / 2' in s
           print('Patched index.html:', len(s), 'bytes')
 
       - name: Commit patch and remove workflow
@@ -154,7 +185,7 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add index.html
-          git commit -m 'Improve Zulu spears and third-person weapons'
+          git commit -m 'Improve Zulu spear and third-person weapons'
           git rm .github/workflows/one-shot-weapon-model-fix.yml
           git commit -m 'Remove temporary weapon model patch workflow'
           git push
