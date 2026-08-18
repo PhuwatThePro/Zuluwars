@@ -336,104 +336,325 @@ html,body{width:100%;height:100%;overflow:hidden;touch-action:none;background:#0
         }
 
         // Character Materials
-        const tunicMat = new THREE.MeshStandardMaterial({ color: 0x315765, roughness: 0.9 }); 
-        const pantsMat = new THREE.MeshStandardMaterial({ color: 0x162731, roughness: 0.95 }); 
-        const helmetMat = new THREE.MeshStandardMaterial({ color: 0xd8d2c1, roughness: 0.9 }); 
-        const skinMat = new THREE.MeshStandardMaterial({ color: 0xb97852, roughness: 1.0 });
-        const beltMat = new THREE.MeshStandardMaterial({ color: 0x8d7754, roughness: 1.0 });
-        const bootMat = new THREE.MeshStandardMaterial({ color: 0x15191b, roughness: 1.0 });
-        const ironMat = new THREE.MeshStandardMaterial({ color: 0x39444a, metalness: 0.65 });
+        const tunicMat = new THREE.MeshStandardMaterial({
+            color: 0x9f2727,
+            roughness: 0.92,
+            metalness: 0.0
+        });
 
-        // Character Mesh Generator with Articulated Joint Pivots
+        const redDarkMat = new THREE.MeshStandardMaterial({
+            color: 0x641717,
+            roughness: 0.95
+        });
+
+        const whiteBeltMat = new THREE.MeshStandardMaterial({
+            color: 0xe5dfcf,
+            roughness: 0.95
+        });
+
+        const pantsMat = new THREE.MeshStandardMaterial({
+            color: 0x17232c,
+            roughness: 1.0
+        });
+
+        const helmetMat = new THREE.MeshStandardMaterial({
+            color: 0xb9a47b,
+            roughness: 1.0
+        });
+
+        const helmetBandMat = new THREE.MeshStandardMaterial({
+            color: 0x6f5b3e,
+            roughness: 1.0
+        });
+
+        const skinMat = new THREE.MeshStandardMaterial({
+            color: 0xb97852,
+            roughness: 1.0
+        });
+
+        const hairMat = new THREE.MeshStandardMaterial({
+            color: 0x241c18,
+            roughness: 1.0
+        });
+
+        const beltMat = new THREE.MeshStandardMaterial({
+            color: 0x6b452c,
+            roughness: 1.0
+        });
+
+        const leatherMat = new THREE.MeshStandardMaterial({
+            color: 0x4a2e20,
+            roughness: 1.0
+        });
+
+        const bootMat = new THREE.MeshStandardMaterial({
+            color: 0x151719,
+            roughness: 1.0
+        });
+
+        const ironMat = new THREE.MeshStandardMaterial({
+            color: 0x4b5050,
+            metalness: 0.72,
+            roughness: 0.38
+        });
+
+        const musketWoodMat = new THREE.MeshStandardMaterial({
+            color: 0x6e3f20,
+            roughness: 0.88
+        });
+
+        const swordMat = new THREE.MeshStandardMaterial({
+            color: 0xd8dadd,
+            metalness: 0.92,
+            roughness: 0.25
+        });
+
         function createSoldierMesh() {
             const pModel = new THREE.Group();
-            
-            // Torso
-            const torso = new THREE.Mesh(new THREE.SphereGeometry(0.43, 8, 6), tunicMat);
-            torso.position.y = 1.0; torso.scale.set(0.88,1.18,0.68); pModel.add(torso);
 
-            const belt1 = new THREE.Mesh(new THREE.BoxGeometry(0.67, 0.08, 0.37), beltMat);
-            belt1.position.y = 0.95; belt1.rotation.z = 0.45;
-            const belt2 = new THREE.Mesh(new THREE.BoxGeometry(0.67, 0.08, 0.37), beltMat);
-            belt2.position.y = 0.95; belt2.rotation.z = -0.45;
-            pModel.add(belt1, belt2);
+            // British infantry silhouette: red tunic, white cross-belts,
+            // dark trousers, boots, khaki pith helmet and a diagonal musket.
+            const torso = new THREE.Mesh(
+                new THREE.BoxGeometry(0.58, 0.72, 0.34),
+                tunicMat
+            );
+            torso.position.set(0, 1.08, 0);
+            pModel.add(torso);
 
-            const collar = new THREE.Mesh(new THREE.ConeGeometry(0.27,0.16,4), helmetMat);
-            collar.rotation.x = Math.PI; collar.position.set(0,1.38,0); pModel.add(collar);
+            // Small lower tunic flare.
+            const skirt = new THREE.Mesh(
+                new THREE.BoxGeometry(0.66, 0.22, 0.38),
+                tunicMat
+            );
+            skirt.position.set(0, 0.72, 0);
+            pModel.add(skirt);
 
-            // Head
-            const headMesh = new THREE.Mesh(new THREE.SphereGeometry(0.235, 8, 6), skinMat);
-            headMesh.position.y = 1.52; pModel.add(headMesh);
+            // White British-style cross belts on the front.
+            const beltA = new THREE.Mesh(
+                new THREE.BoxGeometry(0.075, 0.88, 0.035),
+                whiteBeltMat
+            );
+            beltA.position.set(0, 1.10, -0.19);
+            beltA.rotation.z = -0.52;
 
-            const helmetDome = new THREE.Mesh(new THREE.SphereGeometry(0.25, 8, 4), helmetMat);
-            helmetDome.scale.set(1,0.38,1);
-            helmetDome.position.y = 1.73;
-            const helmetBrim = new THREE.Mesh(new THREE.CylinderGeometry(0.29, 0.29, 0.055, 8), helmetMat);
-            helmetBrim.position.y = 1.66;
-            pModel.add(helmetDome, helmetBrim);
+            const beltB = new THREE.Mesh(
+                new THREE.BoxGeometry(0.075, 0.88, 0.035),
+                whiteBeltMat
+            );
+            beltB.position.set(0, 1.10, -0.195);
+            beltB.rotation.z = 0.52;
 
-            // --- LEGS (Pivoted at hips) ---
+            pModel.add(beltA, beltB);
+
+            // Belt/waist line.
+            const waistBelt = new THREE.Mesh(
+                new THREE.BoxGeometry(0.63, 0.075, 0.39),
+                beltMat
+            );
+            waistBelt.position.set(0, 0.82, 0);
+            pModel.add(waistBelt);
+
+            // Front pouch.
+            const pouch = new THREE.Mesh(
+                new THREE.BoxGeometry(0.18, 0.20, 0.08),
+                beltMat
+            );
+            pouch.position.set(0.30, 0.82, -0.21);
+            pouch.rotation.z = -0.15;
+            pModel.add(pouch);
+
+            // Collar / neck.
+            const neck = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.13, 0.14, 0.16, 8),
+                redDarkMat
+            );
+            neck.position.y = 1.49;
+            pModel.add(neck);
+
+            // Head.
+            const headMesh = new THREE.Mesh(
+                new THREE.SphereGeometry(0.225, 8, 6),
+                skinMat
+            );
+            headMesh.position.set(0, 1.68, -0.015);
+            headMesh.scale.set(0.92, 1.08, 0.90);
+            pModel.add(headMesh);
+
+            // Simple dark moustache / face shadow to match the reference silhouette.
+            const moustache = new THREE.Mesh(
+                new THREE.BoxGeometry(0.13, 0.035, 0.035),
+                hairMat
+            );
+            moustache.position.set(0, 1.64, -0.205);
+            pModel.add(moustache);
+
+            // Pith helmet / tropical helmet.
+            const helmetDome = new THREE.Mesh(
+                new THREE.SphereGeometry(0.255, 8, 5),
+                helmetMat
+            );
+            helmetDome.scale.set(1.0, 0.72, 1.0);
+            helmetDome.position.set(0, 1.89, 0);
+
+            const helmetBrim = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.32, 0.30, 0.055, 10),
+                helmetMat
+            );
+            helmetBrim.position.set(0, 1.80, 0);
+
+            // Helmet band.
+            const helmetBand = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.265, 0.265, 0.055, 10),
+                helmetBandMat
+            );
+            helmetBand.position.set(0, 1.80, 0);
+
+            pModel.add(helmetDome, helmetBrim, helmetBand);
+
+            // Legs, pivoted at the hips.
             const leftLegPivot = new THREE.Group();
-            leftLegPivot.position.set(-0.18, 0.65, 0);
-            const leftLegMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.10, 0.65), pantsMat);
-            leftLegMesh.position.y = -0.325;
-            const leftBoot = new THREE.Mesh(new THREE.CylinderGeometry(0.10, 0.11, 0.20), bootMat);
-            leftBoot.position.set(0, -0.55, 0.03);
+            leftLegPivot.position.set(-0.17, 0.69, 0);
+
+            const leftLegMesh = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.115, 0.105, 0.66, 7),
+                pantsMat
+            );
+            leftLegMesh.position.y = -0.33;
+
+            const leftBoot = new THREE.Mesh(
+                new THREE.BoxGeometry(0.19, 0.20, 0.32),
+                bootMat
+            );
+            leftBoot.position.set(0, -0.69, -0.055);
+            leftBoot.scale.z = 1.12;
+
             leftLegPivot.add(leftLegMesh, leftBoot);
             pModel.add(leftLegPivot);
 
             const rightLegPivot = new THREE.Group();
-            rightLegPivot.position.set(0.18, 0.65, 0);
-            const rightLegMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.10, 0.65), pantsMat);
-            rightLegMesh.position.y = -0.325;
-            const rightBoot = new THREE.Mesh(new THREE.CylinderGeometry(0.10, 0.11, 0.20), bootMat);
-            rightBoot.position.set(0, -0.55, 0.03);
+            rightLegPivot.position.set(0.17, 0.69, 0);
+
+            const rightLegMesh = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.115, 0.105, 0.66, 7),
+                pantsMat
+            );
+            rightLegMesh.position.y = -0.33;
+
+            const rightBoot = new THREE.Mesh(
+                new THREE.BoxGeometry(0.19, 0.20, 0.32),
+                bootMat
+            );
+            rightBoot.position.set(0, -0.69, -0.055);
+            rightBoot.scale.z = 1.12;
+
             rightLegPivot.add(rightLegMesh, rightBoot);
             pModel.add(rightLegPivot);
 
-            // --- ARMS (Pivoted at shoulders) ---
+            // Arms are separate pivot groups so they can actually reach
+            // the musket instead of simply rotating backwards.
             const leftArmPivot = new THREE.Group();
-            leftArmPivot.position.set(-0.38, 1.30, 0);
-            const leftArmMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.08, 0.65), tunicMat);
-            leftArmMesh.position.y = -0.325;
-            const leftHand = new THREE.Mesh(new THREE.SphereGeometry(0.08, 6, 6), skinMat);
-            leftHand.position.y = -0.62;
+            leftArmPivot.position.set(-0.35, 1.34, -0.01);
+
+            const leftArmMesh = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.085, 0.075, 0.53, 7),
+                tunicMat
+            );
+            leftArmMesh.position.y = -0.265;
+
+            const leftHand = new THREE.Mesh(
+                new THREE.SphereGeometry(0.078, 7, 5),
+                skinMat
+            );
+            leftHand.position.y = -0.55;
+
             leftArmPivot.add(leftArmMesh, leftHand);
             pModel.add(leftArmPivot);
 
             const rightArmPivot = new THREE.Group();
-            rightArmPivot.position.set(0.38, 1.30, 0);
-            const rightArmMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.08, 0.65), tunicMat);
-            rightArmMesh.position.y = -0.325;
-            const rightHand = new THREE.Mesh(new THREE.SphereGeometry(0.08, 6, 6), skinMat);
-            rightHand.position.y = -0.62;
+            rightArmPivot.position.set(0.35, 1.34, -0.01);
+
+            const rightArmMesh = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.085, 0.075, 0.53, 7),
+                tunicMat
+            );
+            rightArmMesh.position.y = -0.265;
+
+            const rightHand = new THREE.Mesh(
+                new THREE.SphereGeometry(0.078, 7, 5),
+                skinMat
+            );
+            rightHand.position.y = -0.55;
+
             rightArmPivot.add(rightArmMesh, rightHand);
             pModel.add(rightArmPivot);
 
-            // --- WEAPONS MOUNTED TO HAND PIVOTS ---
-            // 3P Musket
+            // Musket: local +Y points from the stock toward the muzzle.
+            // This makes the orientation explicit and avoids the old
+            // backward-facing barrel problem.
             const tpMusket = new THREE.Group();
-            const tpStock = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.12, 1.2), new THREE.MeshStandardMaterial({ color: 0x4a2e11 }));
-            const tpBarrel = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 1.4), ironMat);
-            tpBarrel.rotation.x = Math.PI / 2; tpBarrel.position.set(0, 0.05, -0.3);
-            tpMusket.add(tpStock, tpBarrel);
-            tpMusket.position.set(0, -0.58, -0.25);
-            rightArmPivot.add(tpMusket);
 
-            // 3P Sword
+            const tpStock = new THREE.Mesh(
+                new THREE.BoxGeometry(0.105, 0.74, 0.10),
+                musketWoodMat
+            );
+            tpStock.position.y = -0.30;
+
+            const tpMetal = new THREE.Mesh(
+                new THREE.BoxGeometry(0.075, 0.13, 0.075),
+                ironMat
+            );
+            tpMetal.position.y = 0.075;
+
+            const tpBarrel = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.027, 0.032, 1.32, 7),
+                ironMat
+            );
+            tpBarrel.position.y = 0.78;
+
+            // Front sight / muzzle cap.
+            const tpMuzzle = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.036, 0.036, 0.055, 7),
+                ironMat
+            );
+            tpMuzzle.position.y = 1.445;
+
+            tpMusket.add(tpStock, tpMetal, tpBarrel, tpMuzzle);
+            tpMusket.position.set(0.02, 0.92, -0.33);
+            tpMusket.rotation.z = -0.43;
+            pModel.add(tpMusket);
+
+            // Bayonet / sling detail.
+            const sling = new THREE.Mesh(
+                new THREE.BoxGeometry(0.025, 0.95, 0.025),
+                leatherMat
+            );
+            sling.position.set(-0.08, 0.83, -0.37);
+            sling.rotation.z = -0.43;
+            pModel.add(sling);
+
+            // Sword remains available for the existing weapon system.
             const tpSword = new THREE.Group();
-            const tpBlade = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.9, 0.01), new THREE.MeshStandardMaterial({ color: 0xeeeeee, metalness: 0.95 }));
-            tpBlade.position.set(0, 0.45, 0);
-            const tpHilt = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.04, 0.06), ironMat);
-            tpHilt.position.set(0, 0.02, 0);
-            tpSword.add(tpBlade, tpHilt);
-            tpSword.position.set(0, -0.58, -0.1);
-            tpSword.rotation.set(-Math.PI / 2, 0, 0);
-            tpSword.visible = false;
-            rightArmPivot.add(tpSword);
 
-            pModel.userData = { 
-                musket: tpMusket, 
+            const tpBlade = new THREE.Mesh(
+                new THREE.BoxGeometry(0.045, 0.88, 0.018),
+                swordMat
+            );
+            tpBlade.position.y = 0.45;
+
+            const tpHilt = new THREE.Mesh(
+                new THREE.BoxGeometry(0.20, 0.045, 0.065),
+                ironMat
+            );
+            tpHilt.position.y = 0.02;
+
+            tpSword.add(tpBlade, tpHilt);
+            tpSword.position.set(0.38, 0.74, -0.02);
+            tpSword.rotation.z = 0.10;
+            tpSword.visible = false;
+            pModel.add(tpSword);
+
+            pModel.userData = {
+                musket: tpMusket,
                 sword: tpSword,
                 leftArm: leftArmPivot,
                 rightArm: rightArmPivot,
@@ -442,6 +663,18 @@ html,body{width:100%;height:100%;overflow:hidden;touch-action:none;background:#0
             };
 
             return pModel;
+        }
+
+        // Rotate a pivot so its local +Y axis points toward a local-space target.
+        // Quaternion.setFromUnitVectors is used instead of lookAt so the
+        // non-uniform torso scale cannot distort the arm orientation.
+        function pointArmAt(pivot, target) {
+            const start = new THREE.Vector3(0, 0, 0);
+            const direction = target.clone().sub(start).normalize();
+            pivot.quaternion.setFromUnitVectors(
+                new THREE.Vector3(0, 1, 0),
+                direction
+            );
         }
 
         // Dynamic Posture & Walking Animation Controller
@@ -454,41 +687,61 @@ html,body{width:100%;height:100%;overflow:hidden;touch-action:none;background:#0
             const lLeg = data.leftLeg;
             const rLeg = data.rightLeg;
 
-            // 1. Weapon Holding Arm Positions
             if (weapon === 'musket') {
                 data.musket.visible = true;
                 data.sword.visible = false;
 
-                // Two-handed rifle stance
-                rArm.rotation.set(-1.1, -0.35, -0.15);
-                lArm.rotation.set(-1.25, 0.55, 0.35);
-                data.musket.rotation.set(Math.PI / 2, 0, -0.1);
+                // Correct two-handed British infantry firing/carry stance.
+                // Targets are in model-local coordinates and sit directly on
+                // the musket stock, so both hands meet the weapon.
+                const rightHandTarget = new THREE.Vector3(
+                    0.17, 0.88, -0.43
+                );
+                const leftHandTarget = new THREE.Vector3(
+                    -0.04, 1.20, -0.45
+                );
+
+                pointArmAt(rArm, rightHandTarget);
+                pointArmAt(lArm, leftHandTarget);
+
+                // Slight bend/twist gives the arms a more natural pose.
+                rArm.rotation.z += 0.08;
+                lArm.rotation.z -= 0.06;
+
+                data.musket.position.set(0.02, 0.92, -0.33);
+                data.musket.rotation.set(0, 0, -0.43);
+
             } else {
                 data.musket.visible = false;
                 data.sword.visible = true;
 
-                // Sword ready stance
-                rArm.rotation.set(-0.65, 0.15, 0.0);
-                lArm.rotation.set(0, 0, 0.15);
+                // Right hand forward with the sword, left arm relaxed.
+                const swordHandTarget = new THREE.Vector3(
+                    0.42, 1.00, -0.35
+                );
+
+                pointArmAt(rArm, swordHandTarget);
+
+                lArm.rotation.set(0, 0, 0.12);
             }
 
-            // 2. Walking Leg & Body Animation
             if (isMoving) {
                 const walkCycle = Math.sin(time * 11);
+
                 lLeg.rotation.x = walkCycle * 0.60;
                 rLeg.rotation.x = -walkCycle * 0.60;
 
-                // Slight walk sway for arms
+                // Keep the musket stable while marching.
                 if (weapon === 'musket') {
-                    rArm.rotation.x += Math.sin(time * 11) * 0.05;
-                    lArm.rotation.x += Math.sin(time * 11) * 0.05;
-                } else {
-                    lArm.rotation.x = -walkCycle * 0.50; // Swing free arm
+                    const bob = Math.sin(time * 11) * 0.018;
+                    data.musket.position.y = 0.92 + bob;
                 }
             } else {
-                // Return legs to neutral standing position
-                lLeg.rotation.x += (0 - lLeg.rotation.x) * 12 * delta;
-                rLeg.rotation.x += (0 - rLeg.rotation.x) * 12 * delta;
+                lLeg.rotation.x +=
+                    (0 - lLeg.rotation.x) * 12 * delta;
+
+                rLeg.rotation.x +=
+                    (0 - rLeg.rotation.x) * 12 * delta;
             }
         }
 
