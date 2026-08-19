@@ -300,6 +300,26 @@ html,body{
     transition:opacity .06s ease
 }
 
+#gatling-prompt{
+    position:absolute;
+    bottom:22%;
+    left:50%;
+    transform:translateX(-50%);
+    background:rgba(7,16,24,0.92);
+    border:1px solid #4d91a8;
+    padding:10px 18px;
+    border-radius:10px;
+    color:#eee8d8;
+    font-weight:bold;
+    font-size:12px;
+    display:none;
+    z-index:12;
+    cursor:pointer;
+    pointer-events:auto;
+    letter-spacing:0.08em;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+}
+
 #wave-banner{
     position:absolute;
     top:25%;
@@ -511,6 +531,7 @@ html,body{
 
 <div id="hit-indicator"></div>
 <div id="damage-flash"></div>
+<div id="gatling-prompt" onclick="toggleGatlingMount()">PRESS [E] TO MAN GATLING GUN</div>
 
 <div id="spectator-msg">
     YOU ARE DOWN - SPECTATING LOBBY
@@ -589,7 +610,7 @@ html,body{
             </div>
 
             <div class="hint-text">
-                WASD MOVE · MOUSE LOOK · CLICK FIRE
+                WASD MOVE · MOUSE LOOK · CLICK FIRE · [E] INTERACT
             </div>
         </div>
 
@@ -813,10 +834,12 @@ const STATE = {
     isDead:false,
 
     remoteIsDead:false,
-    
+
     isOfficer:false,
-    
+
     remoteIsOfficer:false,
+
+    isMountedGatling:false,
 
     wave:1,
 
@@ -838,12 +861,29 @@ const STATE = {
 
     remoteWeapon:'musket',
 
-    // Multiplayer animation state
     attackSerial:0,
 
     remoteAttackSerial:0,
 
     remoteReloading:false
+};
+
+const GATLING_CONFIG = {
+    maxAmmo: 20,
+    reloadTime: 5000,
+    fireRate: 100
+};
+
+const GATLING_STATE = {
+    unlocked: false,
+    yaw: 0,
+    pitch: 0,
+    ammo: 20,
+    reloading: false,
+    reloadStartTime: 0,
+    lastFireTime: 0,
+    isFiring: false,
+    mountedByRemote: false
 };
 
 const CONFIG = {
@@ -884,6 +924,8 @@ let remotePlayerMesh = null;
 let zuluIdCounter = 0;
 
 let networkInterval = null;
+
+let isMouseDown = false;
 
 const container =
     document.getElementById(
@@ -1439,6 +1481,109 @@ function resetBarricades(){
     );
 }
 
+/* GATLING GUN 3D MODEL & OBJECT SETUP */
+let gatlingGroup = null;
+let gatlingSwivel = null;
+let gatlingBarrelsGroup = null;
+let gatlingBarrelsMesh = null;
+
+function buildGatlingGun() {
+    if (gatlingGroup) return;
+
+    gatlingGroup = new THREE.Group();
+    gatlingGroup.position.set(0, 0, -4.5);
+
+    const tripodMat = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.8 });
+    for (let i = 0; i < 3; i++) {
+        const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 1.5), tripodMat);
+        leg.position.y = 0.65;
+        leg.rotation.z = 0.45;
+        leg.rotation.y = (i * Math.PI * 2) / 3;
+        gatlingGroup.add(leg);
+    }
+
+    gatlingSwivel = new THREE.Group();
+    gatlingSwivel.position.y = 1.25;
+    gatlingGroup.add(gatlingSwivel);
+
+    const mountBase = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.25), ironMat);
+    gatlingSwivel.add(mountBase);
+
+    gatlingBarrelsGroup = new THREE.Group();
+    gatlingBarrelsGroup.position.y = 0.15;
+    gatlingSwivel.add(gatlingBarrelsGroup);
+
+    const receiver = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.25, 0.6), ironMat);
+    receiver.position.z = -0.1;
+    gatlingBarrelsGroup.add(receiver);
+
+    const hopper = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.22, 0.18), new THREE.MeshStandardMaterial({ color: 0xc5a059, metalness: 0.8, roughness: 0.3 }));
+    hopper.position.set(0.18, 0.15, -0.1);
+    gatlingBarrelsGroup.add(hopper);
+
+    gatlingBarrelsMesh = new THREE.Group();
+    const numBarrels = 6;
+    for (let i = 0; i < numBarrels; i++) {
+        const angle = (i * Math.PI * 2) / numBarrels;
+        const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 1.3), ironMat);
+        barrel.rotation.x = Math.PI / 2;
+        barrel.position.set(Math.cos(angle) * 0.075, Math.sin(angle) * 0.075, -0.85);
+        gatlingBarrelsMesh.add(barrel);
+    }
+
+    const centerShaft = new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.028, 1.35), ironMat);
+    centerShaft.rotation.x = Math.PI / 2;
+    centerShaft.position.z = -0.85;
+    gatlingBarrelsMesh.add(centerShaft);
+
+    gatlingBarrelsGroup.add(gatlingBarrelsMesh);
+
+    const handleMat = new THREE.MeshStandardMaterial({ color: 0x4a2e11, roughness: 0.9 });
+    const handleLeft = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.25), handleMat);
+    handleLeft.position.set(-0.16, 0, 0.25);
+    const handleRight = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.25), handleMat);
+    handleRight.position.set(0.16, 0, 0.25);
+    gatlingBarrelsGroup.add(handleLeft, handleRight);
+
+    scene.add(gatlingGroup);
+}
+
+function toggleGatlingMount() {
+    if (!GATLING_STATE.unlocked || !gatlingGroup || STATE.isDead || STATE.gameOver) return;
+    const dist = player.position.distanceTo(gatlingGroup.position);
+
+    if (STATE.isMountedGatling) {
+        STATE.isMountedGatling = false;
+        document.getElementById("gatling-prompt").style.display = "none";
+        setCameraMode(STATE.cameraMode);
+        document.getElementById("weapon-val").innerText = STATE.weapon === "musket" ? (STATE.isOfficer ? "PISTOL" : "MUSKET") : "SWORD";
+        document.getElementById("ammo-val").innerText = STATE.weapon === "musket" ? (STATE.reloading ? "RELOADING" : "READY") : "MELEE";
+        document.getElementById("reload-bar-container").style.display = STATE.reloading ? "block" : "none";
+    } else if (dist < 3.2 && !GATLING_STATE.mountedByRemote) {
+        STATE.isMountedGatling = true;
+        weaponNode.visible = false;
+        playerModel.visible = false;
+        document.getElementById("weapon-val").innerText = "GATLING GUN";
+        updateGatlingHUD();
+    }
+}
+
+function updateGatlingHUD() {
+    if (!STATE.isMountedGatling) return;
+    const reloadContainer = document.getElementById("reload-bar-container");
+    const ammoVal = document.getElementById("ammo-val");
+    const reloadBar = document.getElementById("reload-bar");
+
+    if (GATLING_STATE.reloading) {
+        reloadContainer.style.display = "block";
+        ammoVal.innerText = "RELOADING (5s)";
+    } else {
+        reloadContainer.style.display = "none";
+        ammoVal.innerText = `${GATLING_STATE.ammo} / ${GATLING_CONFIG.maxAmmo}`;
+        reloadBar.style.width = "0%";
+    }
+}
+
 function createNametagSprite(
     nameText,
     isOfficerFlag = false
@@ -1520,8 +1665,6 @@ function createNametagSprite(
 
     return sprite;
 }
-
-/* CHARACTER MATERIALS */
 
 function createOfficerTunicMat() {
     const canvas = document.createElement("canvas");
@@ -1891,8 +2034,6 @@ function createSoldierMesh(){
         helmetBand
     );
 
-    /* LEGS */
-
     const leftLegPivot =
         new THREE.Group();
 
@@ -1995,8 +2136,6 @@ function createSoldierMesh(){
         rightLegPivot
     );
 
-    /* ARMS */
-
     const leftArmPivot =
         new THREE.Group();
 
@@ -2087,8 +2226,6 @@ function createSoldierMesh(){
         rightArmPivot
     );
 
-    /* THIRD PERSON MUSKET */
-
     const tpMusket =
         new THREE.Group();
 
@@ -2168,8 +2305,7 @@ function createSoldierMesh(){
     pModel.add(
         tpMusket
     );
-    
-    /* THIRD PERSON PISTOL */
+
     const tpPistol = new THREE.Group();
     const pistolStock = new THREE.Mesh(new THREE.BoxGeometry(.08, .22, .08), musketWoodMat);
     pistolStock.position.y = -.1;
@@ -2202,8 +2338,6 @@ function createSoldierMesh(){
     pModel.add(
         sling
     );
-
-    /* THIRD PERSON SWORD */
 
     const tpSword =
         new THREE.Group();
@@ -2569,8 +2703,6 @@ function updateCharacterPose(
     }
 }
 
-/* PLAYER */
-
 const player =
     new THREE.Group();
 
@@ -2603,8 +2735,6 @@ player.add(
 cameraNode.add(
     camera
 );
-
-/* FIRST PERSON WEAPON */
 
 const weaponNode =
     new THREE.Group();
@@ -2673,8 +2803,6 @@ pistolGroup.add(fpPistolStock, fpPistolBarrel);
 
 weaponNode.add(musketGroup, pistolGroup);
 pistolGroup.visible = false;
-
-/* FIRST PERSON SWORD */
 
 const swordGroup =
     new THREE.Group();
@@ -2791,8 +2919,6 @@ weaponNode.add(
     swordGroup
 );
 
-/* REMOTE */
-
 remotePlayerMesh =
     createSoldierMesh();
 
@@ -2804,8 +2930,6 @@ scene.add(
 );
 
 let nametagSprite=null;
-
-/* SMOKE */
 
 const smokeParticles=[];
 
@@ -2966,8 +3090,6 @@ function updateGunSmoke(
     }
 }
 
-/* HIT RINGS */
-
 const hitRings=[];
 
 const ringGeo =
@@ -3068,8 +3190,6 @@ function updateHitRings(
     }
 }
 
-/* CONTROLS */
-
 let yaw=0;
 
 let pitch=0;
@@ -3082,29 +3202,41 @@ const input={
 const keys={};
 
 document.addEventListener(
-    "click",
+    "mousedown",
     e => {
-        if(
-            !STATE.gameStarted ||
-            STATE.settingsOpen ||
-            STATE.gameOver ||
-            STATE.isDead
-        ){
-            return;
-        }
+        if (e.button === 0) {
+            isMouseDown = true;
+            if(
+                !STATE.gameStarted ||
+                STATE.settingsOpen ||
+                STATE.gameOver ||
+                STATE.isDead
+            ){
+                return;
+            }
 
-        if(
-            document.pointerLockElement !==
-            renderer.domElement
-        ){
-            try{
-                renderer.domElement.requestPointerLock();
-            }catch(err){}
-            return;
-        }
+            if(
+                document.pointerLockElement !==
+                renderer.domElement
+            ){
+                try{
+                    renderer.domElement.requestPointerLock();
+                }catch(err){}
+                return;
+            }
 
-        if(e.button === 0){
-            performAttack();
+            if (!STATE.isMountedGatling) {
+                performAttack();
+            }
+        }
+    }
+);
+
+document.addEventListener(
+    "mouseup",
+    e => {
+        if (e.button === 0) {
+            isMouseDown = false;
         }
     }
 );
@@ -3142,8 +3274,6 @@ document.addEventListener(
         }
     }
 );
-
-/* TOUCH LOOK */
 
 const touchLookZone =
     document.getElementById(
@@ -3247,8 +3377,6 @@ window.addEventListener(
         }
     }
 );
-
-/* JOYSTICK */
 
 const joystickBound =
     document.getElementById(
@@ -3383,7 +3511,12 @@ window.addEventListener(
             e.code==="KeyQ" ||
             e.code==="KeyE"
         ){
-            switchWeapon();
+            if (e.code === "KeyE") {
+                toggleGatlingMount();
+            }
+            if (!STATE.isMountedGatling) {
+                switchWeapon();
+            }
         }
     }
 );
@@ -3394,8 +3527,6 @@ window.addEventListener(
         keys[e.code]=false;
     }
 );
-
-/* NETWORK */
 
 function initPeer(
     customId=null
@@ -3418,13 +3549,16 @@ function initPeer(
 }
 
 function processSecretCode() {
-    const code = document.getElementById("secret-code-input").value;
+    const code = document.getElementById("secret-code-input").value.trim().toLowerCase();
     if (code === "41108") {
         STATE.isOfficer = true;
     }
+    if (code === "gatling") {
+        GATLING_STATE.unlocked = true;
+        buildGatlingGun();
+    }
     applyOfficerVisuals(playerModel, STATE.isOfficer);
     
-    // Apply initial weapon view updates
     pistolGroup.visible = (STATE.weapon === "musket" && STATE.isOfficer);
     musketGroup.visible = (STATE.weapon === "musket" && !STATE.isOfficer);
     
@@ -3549,7 +3683,8 @@ function setupNetwork(){
                 type:"HANDSHAKE",
                 name:playerName,
                 version:GAME_VERSION,
-                isOfficer: STATE.isOfficer
+                isOfficer: STATE.isOfficer,
+                gatlingUnlocked: GATLING_STATE.unlocked
             });
         }
     );
@@ -3565,6 +3700,11 @@ function setupNetwork(){
 
                 remotePlayerName =
                     data.name;
+
+                if (data.gatlingUnlocked && !GATLING_STATE.unlocked) {
+                    GATLING_STATE.unlocked = true;
+                    buildGatlingGun();
+                }
                     
                 STATE.remoteIsOfficer = !!data.isOfficer;
                 applyOfficerVisuals(remotePlayerMesh, STATE.remoteIsOfficer);
@@ -3614,6 +3754,23 @@ function setupNetwork(){
 
                 STATE.remoteReloading =
                     !!data.reloading;
+
+                if (data.gatling) {
+                    if (data.gatling.unlocked && !GATLING_STATE.unlocked) {
+                        GATLING_STATE.unlocked = true;
+                        buildGatlingGun();
+                    }
+
+                    GATLING_STATE.mountedByRemote = !!data.gatling.isMounted;
+
+                    if (gatlingSwivel && gatlingBarrelsGroup && GATLING_STATE.mountedByRemote) {
+                        gatlingSwivel.rotation.y = data.gatling.yaw;
+                        gatlingBarrelsGroup.rotation.x = data.gatling.pitch;
+                        if (data.gatling.isFiring && gatlingBarrelsMesh) {
+                            gatlingBarrelsMesh.rotation.z += 0.6;
+                        }
+                    }
+                }
                     
                 if (data.isOfficer !== undefined && data.isOfficer !== remotePlayerMesh.userData.isOfficer) {
                     STATE.remoteIsOfficer = !!data.isOfficer;
@@ -3778,7 +3935,15 @@ function sendNetworkPacket(){
             STATE.reloading,
 
         attackSerial:
-            STATE.attackSerial
+            STATE.attackSerial,
+
+        gatling: {
+            unlocked: GATLING_STATE.unlocked,
+            isMounted: STATE.isMountedGatling,
+            yaw: GATLING_STATE.yaw,
+            pitch: GATLING_STATE.pitch,
+            isFiring: GATLING_STATE.isFiring
+        }
     };
 
     if(
@@ -3837,6 +4002,10 @@ function startGame(){
 
     STATE.gameStarted=true;
 
+    if (GATLING_STATE.unlocked) {
+        buildGatlingGun();
+    }
+
     if(
         isHost ||
         !conn
@@ -3844,8 +4013,6 @@ function startGame(){
         startWave(1);
     }
 }
-
-/* ZULUS */
 
 const zulus=[];
 
@@ -4159,7 +4326,7 @@ function setCameraMode(
             false;
 
         weaponNode.visible=
-            !STATE.isDead;
+            !STATE.isDead && !STATE.isMountedGatling;
 
         document.getElementById(
             "btn-cam-1p"
@@ -4182,7 +4349,7 @@ function setCameraMode(
         );
 
         playerModel.visible=
-            !STATE.isDead;
+            !STATE.isDead && !STATE.isMountedGatling;
 
         weaponNode.visible=
             false;
@@ -4305,7 +4472,8 @@ function switchWeapon(){
     if(
         STATE.isDead ||
         STATE.gameOver ||
-        !STATE.gameStarted
+        !STATE.gameStarted ||
+        STATE.isMountedGatling
     ){
         return;
     }
@@ -4538,7 +4706,8 @@ function performAttack(){
         STATE.gameOver ||
         !STATE.gameStarted ||
         STATE.settingsOpen ||
-        STATE.isDead
+        STATE.isDead ||
+        STATE.isMountedGatling
     ){
         return;
     }
@@ -4808,12 +4977,21 @@ function performAttack(){
     }
 }
 
-document.getElementById(
-    "btn-attack"
-).addEventListener(
-    "click",
-    performAttack
-);
+const btnAttack = document.getElementById("btn-attack");
+btnAttack.addEventListener("touchstart", (e) => {
+    isMouseDown = true;
+    if (!STATE.isMountedGatling) performAttack();
+});
+btnAttack.addEventListener("touchend", (e) => {
+    isMouseDown = false;
+});
+btnAttack.addEventListener("mousedown", (e) => {
+    isMouseDown = true;
+    if (!STATE.isMountedGatling) performAttack();
+});
+btnAttack.addEventListener("mouseup", (e) => {
+    isMouseDown = false;
+});
 
 document.getElementById(
     "btn-switch"
@@ -4853,6 +5031,20 @@ function animate(){
         delta
     );
 
+    if (GATLING_STATE.unlocked && gatlingGroup && !STATE.isDead && !STATE.gameOver) {
+        const promptEl = document.getElementById("gatling-prompt");
+        const dist = player.position.distanceTo(gatlingGroup.position);
+        if (STATE.isMountedGatling) {
+            promptEl.style.display = "block";
+            promptEl.innerText = "PRESS [E] OR TAP TO DISMOUNT GATLING GUN";
+        } else if (dist < 3.2 && !GATLING_STATE.mountedByRemote) {
+            promptEl.style.display = "block";
+            promptEl.innerText = "PRESS [E] OR TAP TO MAN GATLING GUN";
+        } else {
+            promptEl.style.display = "none";
+        }
+    }
+
     if(
         !STATE.gameOver
     ){
@@ -4861,96 +5053,196 @@ function animate(){
             !STATE.isDead
         ){
 
-            player.rotation.y=
-                yaw;
-
-            cameraNode.rotation.x=
-                pitch;
-
-            weaponNode.rotation.x=
-                pitch;
-
-            let moveZ =
-                input.forward +
-                (
-                    keys["KeyW"] ||
-                    keys["ArrowUp"]
-                        ? 1
-                        : 0
-                ) -
-                (
-                    keys["KeyS"] ||
-                    keys["ArrowDown"]
-                        ? 1
-                        : 0
-                );
-
-            let moveX =
-                input.right +
-                (
-                    keys["KeyD"] ||
-                    keys["ArrowRight"]
-                        ? 1
-                        : 0
-                ) -
-                (
-                    keys["KeyA"] ||
-                    keys["ArrowLeft"]
-                        ? 1
-                        : 0
-                );
-
-            const moveDir =
-                new THREE.Vector3(
-                    moveX,
+            if (STATE.isMountedGatling && gatlingGroup) {
+                player.position.set(
+                    gatlingGroup.position.x - Math.sin(yaw) * 0.7,
                     0,
-                    -moveZ
-                ).normalize();
-
-            STATE.isMoving =
-                moveDir.lengthSq()>.01;
-
-            updateMusketCrosshair();
-
-            if(
-                STATE.isMoving
-            ){
-
-                moveDir.applyAxisAngle(
-                    new THREE.Vector3(
-                        0,
-                        1,
-                        0
-                    ),
-                    yaw
+                    gatlingGroup.position.z + Math.cos(yaw) * 0.7
                 );
+                
+                GATLING_STATE.yaw = yaw;
+                GATLING_STATE.pitch = pitch;
 
-                const next =
-                    player.position
-                        .clone()
-                        .addScaledVector(
-                            moveDir,
-                            .1
-                        );
+                if (gatlingSwivel && gatlingBarrelsGroup) {
+                    gatlingSwivel.rotation.y = GATLING_STATE.yaw;
+                    gatlingBarrelsGroup.rotation.x = GATLING_STATE.pitch;
+                }
+
+                cameraNode.rotation.x = pitch;
+                player.rotation.y = yaw;
+
+                const now = performance.now();
+                if (GATLING_STATE.reloading) {
+                    const elapsed = now - GATLING_STATE.reloadStartTime;
+                    const progress = Math.min(elapsed / GATLING_CONFIG.reloadTime, 1);
+                    document.getElementById("reload-bar-container").style.display = "block";
+                    document.getElementById("reload-bar").style.width = `${progress * 100}%`;
+                    document.getElementById("ammo-val").innerText = "RELOADING (5s)";
+
+                    if (progress >= 1) {
+                        GATLING_STATE.reloading = false;
+                        GATLING_STATE.ammo = GATLING_CONFIG.maxAmmo;
+                        updateGatlingHUD();
+                    }
+                } else if (isMouseDown) {
+                    if (now - GATLING_STATE.lastFireTime >= GATLING_CONFIG.fireRate) {
+                        if (GATLING_STATE.ammo > 0) {
+                            GATLING_STATE.ammo--;
+                            GATLING_STATE.lastFireTime = now;
+                            GATLING_STATE.isFiring = true;
+
+                            if (gatlingBarrelsMesh) {
+                                gatlingBarrelsMesh.rotation.z += 0.6;
+                            }
+
+                            const muzzleWorldPos = new THREE.Vector3();
+                            gatlingBarrelsGroup.getWorldPosition(muzzleWorldPos);
+                            
+                            const fireDir = new THREE.Vector3(0, 0, -1);
+                            fireDir.applyQuaternion(gatlingBarrelsGroup.getWorldQuaternion(new THREE.Quaternion()));
+
+                            spawnGunSmoke(muzzleWorldPos, fireDir);
+
+                            if (conn && conn.open) {
+                                conn.send({
+                                    type: "SMOKE_FX",
+                                    x: muzzleWorldPos.x, y: muzzleWorldPos.y, z: muzzleWorldPos.z,
+                                    dx: fireDir.x, dy: fireDir.y, dz: fireDir.z
+                                });
+                            }
+
+                            const hitboxes = [];
+                            zulus.forEach(z => {
+                                if (z.headHitbox) hitboxes.push(z.headHitbox);
+                                if (z.bodyHitbox) hitboxes.push(z.bodyHitbox);
+                            });
+
+                            const raycaster = new THREE.Raycaster(muzzleWorldPos, fireDir);
+                            const hits = raycaster.intersectObjects(hitboxes);
+
+                            if (hits.length > 0) {
+                                const hit = hits[0];
+                                const zuluId = hit.object.userData.zuluId;
+                                const part = hit.object.userData.part;
+                                const damage = part === "head" ? 2 : 1;
+
+                                if (isHost || !conn) {
+                                    damageZulu(zuluId, damage, hit.point);
+                                } else {
+                                    conn.send({
+                                        type: "HIT_ZULU",
+                                        zuluId: zuluId,
+                                        damage: damage,
+                                        hitPos: { x: hit.point.x, y: hit.point.y, z: hit.point.z }
+                                    });
+                                }
+                            }
+
+                            updateGatlingHUD();
+
+                            if (GATLING_STATE.ammo <= 0) {
+                                GATLING_STATE.reloading = true;
+                                GATLING_STATE.reloadStartTime = now;
+                                updateGatlingHUD();
+                            }
+                        }
+                    }
+                } else {
+                    GATLING_STATE.isFiring = false;
+                }
+
+            } else {
+                player.rotation.y=
+                    yaw;
+
+                cameraNode.rotation.x=
+                    pitch;
+
+                weaponNode.rotation.x=
+                    pitch;
+
+                let moveZ =
+                    input.forward +
+                    (
+                        keys["KeyW"] ||
+                        keys["ArrowUp"]
+                            ? 1
+                            : 0
+                    ) -
+                    (
+                        keys["KeyS"] ||
+                        keys["ArrowDown"]
+                            ? 1
+                            : 0
+                    );
+
+                let moveX =
+                    input.right +
+                    (
+                        keys["KeyD"] ||
+                        keys["ArrowRight"]
+                            ? 1
+                            : 0
+                    ) -
+                    (
+                        keys["KeyA"] ||
+                        keys["ArrowLeft"]
+                            ? 1
+                            : 0
+                    );
+
+                const moveDir =
+                    new THREE.Vector3(
+                        moveX,
+                        0,
+                        -moveZ
+                    ).normalize();
+
+                STATE.isMoving =
+                    moveDir.lengthSq()>.01;
+
+                updateMusketCrosshair();
 
                 if(
-                    !checkMountainCollision(
-                        next
-                    )
+                    STATE.isMoving
                 ){
-                    player.position.copy(
-                        next
-                    );
-                }
-            }
 
-            updateCharacterPose(
-                playerModel,
-                STATE.isMoving,
-                STATE.weapon,
-                time,
-                delta
-            );
+                    moveDir.applyAxisAngle(
+                        new THREE.Vector3(
+                            0,
+                            1,
+                            0
+                        ),
+                        yaw
+                    );
+
+                    const next =
+                        player.position
+                            .clone()
+                            .addScaledVector(
+                                moveDir,
+                                .1
+                            );
+
+                    if(
+                        !checkMountainCollision(
+                            next
+                        )
+                    ){
+                        player.position.copy(
+                            next
+                        );
+                    }
+                }
+
+                updateCharacterPose(
+                    playerModel,
+                    STATE.isMoving,
+                    STATE.weapon,
+                    time,
+                    delta
+                );
+            }
 
             zulus.forEach(
                 z => {
@@ -5027,7 +5319,7 @@ function animate(){
         }
 
         if(
-            STATE.reloading
+            STATE.reloading && !STATE.isMountedGatling
         ){
 
             const now =
@@ -5076,7 +5368,7 @@ function animate(){
 
         if(
             STATE.weapon ===
-            "sword"
+            "sword" && !STATE.isMountedGatling
         ){
 
             const slashAge =
@@ -5328,6 +5620,10 @@ function handlePlayerDeath(){
 
     STATE.isDead=true;
 
+    if (STATE.isMountedGatling) {
+        toggleGatlingMount();
+    }
+
     document.getElementById(
         "hp-val"
     ).innerText=0;
@@ -5409,6 +5705,13 @@ function resetGame(){
     STATE.remoteAttackSerial=0;
 
     STATE.remoteReloading=false;
+
+    if (STATE.isMountedGatling) {
+        STATE.isMountedGatling = false;
+    }
+
+    GATLING_STATE.ammo = GATLING_CONFIG.maxAmmo;
+    GATLING_STATE.reloading = false;
 
     player.position.set(
         0,
