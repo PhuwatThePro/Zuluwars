@@ -882,6 +882,216 @@ let remotePlayers = {};
 let zuluIdCounter = 0;
 let networkInterval = null;
 let isMouseDown = false;
+let lastLocalStepTime = 0;
+
+/* --- WEB AUDIO PROCEDURAL SYNTHESIZER --- */
+let audioCtx = null;
+
+function initAudio() {
+    if (!audioCtx) {
+        const AudioCtxClass = window.AudioContext || window.webkitAudioContext;
+        if (AudioCtxClass) {
+            audioCtx = new AudioCtxClass();
+        }
+    }
+    if (audioCtx && audioCtx.state === 'suspended') {
+        audioCtx.resume();
+    }
+}
+window.addEventListener("click", initAudio);
+window.addEventListener("keydown", initAudio);
+window.addEventListener("touchstart", initAudio);
+
+function playSound3D(type, posVec3) {
+    if (!audioCtx) return;
+    const listenerPos = camera.getWorldPosition(new THREE.Vector3());
+    const dist = listenerPos.distanceTo(posVec3);
+    if (dist > 75) return;
+
+    const vol = Math.max(0, 1 - (dist / 75));
+    if (vol <= 0.001) return;
+
+    const now = audioCtx.currentTime;
+
+    if (type === 'musket') {
+        let osc = audioCtx.createOscillator();
+        let gain = audioCtx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(160, now);
+        osc.frequency.exponentialRampToValueAtTime(30, now + 0.35);
+        gain.gain.setValueAtTime(vol * 0.9, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(now);
+        osc.stop(now + 0.35);
+
+        let bufferSize = audioCtx.sampleRate * 0.4;
+        let buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+        let output = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) output[i] = Math.random() * 2 - 1;
+        let noise = audioCtx.createBufferSource();
+        noise.buffer = buffer;
+        let filter = audioCtx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(2800, now);
+        filter.frequency.exponentialRampToValueAtTime(200, now + 0.4);
+        let noiseGain = audioCtx.createGain();
+        noiseGain.gain.setValueAtTime(vol * 1.0, now);
+        noiseGain.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+        noise.connect(filter);
+        filter.connect(noiseGain);
+        noiseGain.connect(audioCtx.destination);
+        noise.start(now);
+
+    } else if (type === 'gatling') {
+        let osc = audioCtx.createOscillator();
+        let gain = audioCtx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(220, now);
+        osc.frequency.exponentialRampToValueAtTime(40, now + 0.08);
+        gain.gain.setValueAtTime(vol * 0.7, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.08);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(now);
+        osc.stop(now + 0.08);
+
+        let bufferSize = audioCtx.sampleRate * 0.08;
+        let buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+        let output = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) output[i] = Math.random() * 2 - 1;
+        let noise = audioCtx.createBufferSource();
+        noise.buffer = buffer;
+        let filter = audioCtx.createBiquadFilter();
+        filter.type = 'bandpass';
+        filter.frequency.setValueAtTime(1200, now);
+        let noiseGain = audioCtx.createGain();
+        noiseGain.gain.setValueAtTime(vol * 0.8, now);
+        noiseGain.gain.exponentialRampToValueAtTime(0.01, now + 0.08);
+        noise.connect(filter);
+        filter.connect(noiseGain);
+        noiseGain.connect(audioCtx.destination);
+        noise.start(now);
+
+    } else if (type === 'sword') {
+        let bufferSize = audioCtx.sampleRate * 0.2;
+        let buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+        let output = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) output[i] = Math.random() * 2 - 1;
+        let noise = audioCtx.createBufferSource();
+        noise.buffer = buffer;
+        let filter = audioCtx.createBiquadFilter();
+        filter.type = 'bandpass';
+        filter.frequency.setValueAtTime(400, now);
+        filter.frequency.exponentialRampToValueAtTime(1800, now + 0.1);
+        filter.frequency.exponentialRampToValueAtTime(200, now + 0.2);
+        let gain = audioCtx.createGain();
+        gain.gain.setValueAtTime(vol * 0.5, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+        noise.connect(filter);
+        filter.connect(gain);
+        gain.connect(audioCtx.destination);
+        noise.start(now);
+
+    } else if (type === 'footstep') {
+        let osc = audioCtx.createOscillator();
+        let gain = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(110, now);
+        osc.frequency.exponentialRampToValueAtTime(35, now + 0.08);
+        gain.gain.setValueAtTime(vol * 0.22, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(now);
+        osc.stop(now + 0.08);
+
+    } else if (type === 'zulu_attack') {
+        let osc = audioCtx.createOscillator();
+        let gain = audioCtx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(190, now);
+        osc.frequency.linearRampToValueAtTime(110, now + 0.25);
+        gain.gain.setValueAtTime(vol * 0.6, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
+        let filter = audioCtx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.value = 850;
+        osc.connect(filter);
+        filter.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(now);
+        osc.stop(now + 0.25);
+
+    } else if (type === 'zulu_death') {
+        let osc = audioCtx.createOscillator();
+        let gain = audioCtx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(220, now);
+        osc.frequency.linearRampToValueAtTime(60, now + 0.45);
+        gain.gain.setValueAtTime(vol * 0.75, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.45);
+        let filter = audioCtx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.value = 900;
+        osc.connect(filter);
+        filter.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(now);
+        osc.stop(now + 0.45);
+
+    } else if (type === 'reload') {
+        let osc = audioCtx.createOscillator();
+        let gain = audioCtx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(1100, now);
+        osc.frequency.exponentialRampToValueAtTime(350, now + 0.06);
+        gain.gain.setValueAtTime(vol * 0.45, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.06);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(now);
+        osc.stop(now + 0.06);
+
+    } else if (type === 'hit') {
+        let osc = audioCtx.createOscillator();
+        let gain = audioCtx.createGain();
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(160, now);
+        osc.frequency.exponentialRampToValueAtTime(30, now + 0.12);
+        gain.gain.setValueAtTime(vol * 0.5, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.12);
+        let filter = audioCtx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.value = 550;
+        osc.connect(filter);
+        filter.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(now);
+        osc.stop(now + 0.12);
+    }
+}
+
+function emitAudioEvent(soundType, posVec3) {
+    playSound3D(soundType, posVec3);
+    const data = {
+        type: "AUDIO_FX",
+        sound: soundType,
+        x: posVec3.x,
+        y: posVec3.y,
+        z: posVec3.z
+    };
+    if (isHost) {
+        connections.forEach(c => {
+            if (c && c.open) {
+                try { c.send(data); } catch(e){}
+            }
+        });
+    } else if (conn && conn.open) {
+        try { conn.send(data); } catch(e){}
+    }
+}
 
 const container = document.getElementById("canvas-container");
 
@@ -1409,7 +1619,6 @@ function pointArmAt(pivot, target){
     pivot.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction);
 }
 
-/* FIXED: Accept isReloading directly instead of assuming model === playerModel */
 function updateCharacterPose(model, isMoving, weapon, time, delta, isMountedGatling = false, isReloading = false){
     const data = model.userData;
     if (!data.leftArm || !data.rightArm) return;
@@ -1845,7 +2054,8 @@ function syncRemotePlayers(playersData) {
                 name: p.name || "Player",
                 mesh: mesh,
                 nametag: nametag,
-                lastAttackSerial: p.attackSerial || 0
+                lastAttackSerial: p.attackSerial || 0,
+                lastStepTime: 0
             };
         }
 
@@ -1853,6 +2063,14 @@ function syncRemotePlayers(playersData) {
         rp.mesh.position.set(p.x, p.y, p.z);
         rp.mesh.rotation.y = p.yaw;
         rp.mesh.visible = !p.isDead;
+
+        if (p.isMoving && !p.isDead) {
+            const nowStep = performance.now();
+            if (nowStep - rp.lastStepTime > 340) {
+                playSound3D('footstep', rp.mesh.position);
+                rp.lastStepTime = nowStep;
+            }
+        }
 
         if (p.isOfficer !== rp.mesh.userData.isOfficer) {
             applyOfficerVisuals(rp.mesh, p.isOfficer);
@@ -1866,7 +2084,6 @@ function syncRemotePlayers(playersData) {
             rp.mesh.userData.slashTime = performance.now();
         }
 
-        /* FIXED: Pass p.reloading into updateCharacterPose */
         updateCharacterPose(
             rp.mesh,
             p.isMoving,
@@ -1980,6 +2197,14 @@ function handleHostData(c, data) {
             }
         });
     }
+    else if (data.type === "AUDIO_FX") {
+        playSound3D(data.sound, new THREE.Vector3(data.x, data.y, data.z));
+        connections.forEach(clientConn => {
+            if (clientConn !== c && clientConn.open) {
+                try { clientConn.send(data); } catch(e){}
+            }
+        });
+    }
 }
 
 function handleClientData(data) {
@@ -2033,6 +2258,9 @@ function handleClientData(data) {
             new THREE.Vector3(data.x, data.y, data.z),
             new THREE.Vector3(data.dx, data.dy, data.dz)
         );
+    }
+    else if (data.type === "AUDIO_FX") {
+        playSound3D(data.sound, new THREE.Vector3(data.x, data.y, data.z));
     }
 }
 
@@ -2094,7 +2322,6 @@ function setupClientNetwork(){
 
 function sendNetworkPacket(){
     if (isHost) {
-        /* FIXED: Host must synchronize remote player meshes so it can render them */
         syncRemotePlayers(Object.values(remotePlayersData));
 
         const localId = peer ? peer.id : 'host';
@@ -2124,7 +2351,8 @@ function sendNetworkPacket(){
                 id: z.id,
                 x: z.group.position.x,
                 z: z.group.position.z,
-                hp: z.hp
+                hp: z.hp,
+                seed: z.seed
             })),
             barricades: barricades.map(b => b.active),
             gatling: {
@@ -2186,59 +2414,212 @@ function startGame(){
 }
 
 const zulus=[];
-const zuluMat = new THREE.MeshStandardMaterial({ color:0x5d3f32, roughness:.95 });
 
-function createZulu(id=null, x=null, z=null){
+/* --- REVAMPED RANDOMIZED ZULU WARRIOR GENERATOR --- */
+function makeZuluTexture(patternType, primaryColor, secondaryColor) {
+    const canvas = document.createElement("canvas");
+    canvas.width = 128;
+    canvas.height = 256;
+    const ctx = canvas.getContext("2d");
+
+    ctx.fillStyle = primaryColor;
+    ctx.fillRect(0, 0, 128, 256);
+
+    ctx.fillStyle = secondaryColor;
+    if (patternType === 0) { // Spotted hide
+        for (let i = 0; i < 18; i++) {
+            ctx.beginPath();
+            const cx = Math.random() * 128;
+            const cy = Math.random() * 256;
+            const rx = 8 + Math.random() * 20;
+            const ry = 12 + Math.random() * 28;
+            ctx.ellipse(cx, cy, rx, ry, Math.random() * Math.PI, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    } else if (patternType === 1) { // Striped war hide
+        for (let i = 0; i < 10; i++) {
+            ctx.fillRect(0, i * 26, 128, 12);
+        }
+    } else { // Center stripe pattern
+        ctx.fillRect(44, 0, 40, 256);
+    }
+
+    return new THREE.CanvasTexture(canvas);
+}
+
+function createZulu(id=null, x=null, z=null, seed=null){
+    const zId = id !== null ? id : zuluIdCounter++;
+    const zSeed = seed !== null ? seed : Math.floor(Math.random() * 100000);
+
+    let rngState = zSeed;
+    function rand() {
+        rngState = (rngState * 9301 + 49297) % 233280;
+        return rngState / 233280;
+    }
+
+    const skinTones = [0x3a2318, 0x4a2e1b, 0x2d1a10, 0x523522];
+    const furColors = [0xeeeeee, 0x222222, 0xc2a678, 0x8c6b43];
+    const featherColors = [0xd63030, 0xf0f0f0, 0x1a1a1a];
+
+    const skinMat = new THREE.MeshStandardMaterial({ color: skinTones[Math.floor(rand() * skinTones.length)], roughness: 0.85 });
+    const furMat = new THREE.MeshStandardMaterial({ color: furColors[Math.floor(rand() * furColors.length)], roughness: 0.95 });
+    const featherMat = new THREE.MeshStandardMaterial({ color: featherColors[Math.floor(rand() * featherColors.length)], roughness: 0.6 });
+    const woodMat = new THREE.MeshStandardMaterial({ color: 0x422a18, roughness: 0.9 });
+    const ironBladeMat = new THREE.MeshStandardMaterial({ color: 0xc8d1d3, metalness: 0.85, roughness: 0.3 });
+
+    // Shield textures (Cowhide / Zebra hide patterns)
+    const pType = Math.floor(rand() * 3);
+    const pCol = rand() > 0.5 ? "#111111" : "#4a2a18";
+    const sTex = makeZuluTexture(pType, "#f5f2e9", pCol);
+    const shieldMat = new THREE.MeshStandardMaterial({ map: sTex, roughness: 0.8 });
+
     const group = new THREE.Group();
 
-    const body = new THREE.Mesh(new THREE.CylinderGeometry(.38, .35, 1.4), zuluMat);
-    body.position.y=1.2;
-    group.add(body);
+    // Scale variation
+    const scaleY = 0.92 + rand() * 0.18;
+    const scaleXZ = 0.92 + rand() * 0.16;
 
-    const head = new THREE.Mesh(new THREE.SphereGeometry(.28, 8, 8), zuluMat);
-    head.position.y=2.1;
-    group.add(head);
+    const visualRoot = new THREE.Group();
+    visualRoot.scale.set(scaleXZ, scaleY, scaleXZ);
+    group.add(visualRoot);
 
-    const shield = new THREE.Mesh(new THREE.BoxGeometry(.6, 1.3, .05), new THREE.MeshStandardMaterial({ color:0x8b6a45 }));
-    shield.position.set(-.4, 1.2, .3);
-    group.add(shield);
+    // Torso (V-shaped chest)
+    const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.38, 0.28, 1.1, 8), skinMat);
+    torso.position.y = 1.25;
+    visualRoot.add(torso);
 
-    const spearShaft = new THREE.Mesh(new THREE.CylinderGeometry(.022, .022, 3.15, 8), new THREE.MeshStandardMaterial({ color:0x4a2e11, roughness:.8 }));
-    spearShaft.rotation.x = Math.PI/2;
-    spearShaft.position.set(.4, 1.2, .78);
-    group.add(spearShaft);
+    // Fur Kilt / Waist wrap (Isinene)
+    const kilt = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.42, 0.45, 8), furMat);
+    kilt.position.y = 0.82;
+    visualRoot.add(kilt);
 
-    const spearHead = new THREE.Mesh(new THREE.ConeGeometry(.085, .42, 6), new THREE.MeshStandardMaterial({ color:0xbfc5c9, metalness:.9, roughness:.22 }));
-    spearHead.rotation.x = -Math.PI/2;
-    spearHead.position.set(.4, 1.2, 2.56);
-    group.add(spearHead);
+    // Head
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.24, 8, 8), skinMat);
+    head.position.y = 2.02;
+    visualRoot.add(head);
 
-    const zId = id !== null ? id : zuluIdCounter++;
+    // Headband (Umqhele) & Feather Plume
+    const headband = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.25, 0.08, 8), furMat);
+    headband.position.y = 2.08;
+    visualRoot.add(headband);
 
-    const headHitbox = new THREE.Mesh(new THREE.SphereGeometry(.32, 8, 8), new THREE.MeshBasicMaterial({ visible:false }));
-    headHitbox.position.y= 2.1;
-    headHitbox.userData={ zuluId:zId, part:"head" };
+    const featherCount = 1 + Math.floor(rand() * 3);
+    for (let f = 0; f < featherCount; f++) {
+        const feather = new THREE.Mesh(new THREE.ConeGeometry(0.04, 0.5, 4), featherMat);
+        feather.position.set((f - (featherCount - 1) / 2) * 0.08, 2.38, -0.1);
+        feather.rotation.z = (f - (featherCount - 1) / 2) * -0.2;
+        visualRoot.add(feather);
+    }
+
+    // War Paint Stripes (Face/Chest)
+    if (rand() > 0.4) {
+        const paintMat = new THREE.MeshBasicMaterial({ color: rand() > 0.5 ? 0xeeeeee : 0xb82e2e });
+        const facePaint = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.04, 0.28), paintMat);
+        facePaint.position.set(0, 2.0, 0.02);
+        visualRoot.add(facePaint);
+    }
+
+    // Left Leg
+    const leftLegPivot = new THREE.Group();
+    leftLegPivot.position.set(-0.16, 0.7, 0);
+    const leftLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.09, 0.72, 8), skinMat);
+    leftLeg.position.y = -0.36;
+    const leftFurBand = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.13, 0.12, 8), furMat);
+    leftFurBand.position.y = -0.32;
+    leftLegPivot.add(leftLeg, leftFurBand);
+    visualRoot.add(leftLegPivot);
+
+    // Right Leg
+    const rightLegPivot = new THREE.Group();
+    rightLegPivot.position.set(0.16, 0.7, 0);
+    const rightLeg = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.09, 0.72, 8), skinMat);
+    rightLeg.position.y = -0.36;
+    const rightFurBand = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.13, 0.12, 8), furMat);
+    rightFurBand.position.y = -0.32;
+    rightLegPivot.add(rightLeg, rightFurBand);
+    visualRoot.add(rightLegPivot);
+
+    // Left Arm (Holds Shield)
+    const leftArmPivot = new THREE.Group();
+    leftArmPivot.position.set(-0.38, 1.6, 0);
+    const leftArm = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.07, 0.6, 8), skinMat);
+    leftArm.position.y = -0.3;
+    leftArmPivot.add(leftArm);
+
+    // Curved Oval Hide Shield (Isihlangu)
+    const shieldGroup = new THREE.Group();
+    const shieldMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.38, 0.38, 1.35, 8, 1, false, 0, Math.PI), shieldMat);
+    shieldMesh.rotation.y = Math.PI / 2;
+    shieldMesh.scale.set(0.3, 1, 0.8);
+    shieldGroup.add(shieldMesh);
+
+    // Shield Central Spine (Umshocho)
+    const shieldSpine = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 1.5, 6), woodMat);
+    shieldSpine.position.z = 0.08;
+    const pomTop = new THREE.Mesh(new THREE.SphereGeometry(0.06, 6, 6), furMat);
+    pomTop.position.set(0, 0.75, 0.08);
+    const pomBot = new THREE.Mesh(new THREE.SphereGeometry(0.06, 6, 6), furMat);
+    pomBot.position.set(0, -0.75, 0.08);
+    shieldGroup.add(shieldSpine, pomTop, pomBot);
+
+    shieldGroup.position.set(-0.15, -0.2, 0.35);
+    shieldGroup.rotation.y = 0.35;
+    leftArmPivot.add(shieldGroup);
+    visualRoot.add(leftArmPivot);
+
+    // Right Arm (Holds Iklwa Spear)
+    const rightArmPivot = new THREE.Group();
+    rightArmPivot.position.set(0.38, 1.6, 0);
+    const rightArm = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.07, 0.6, 8), skinMat);
+    rightArm.position.y = -0.3;
+    rightArmPivot.add(rightArm);
+
+    // Short Stabbing Spear (Iklwa)
+    const spearGroup = new THREE.Group();
+    const spearShaft = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 1.8, 8), woodMat);
+    spearShaft.position.y = 0.3;
+
+    // Broad Leaf-shaped Iron Blade
+    const spearBlade = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.55, 4), ironBladeMat);
+    spearBlade.position.y = 1.35;
+    spearBlade.scale.set(0.25, 1, 1);
+
+    spearGroup.add(spearShaft, spearBlade);
+    spearGroup.rotation.x = Math.PI / 2.3;
+    spearGroup.position.set(0, -0.35, 0.25);
+    rightArmPivot.add(spearGroup);
+    visualRoot.add(rightArmPivot);
+
+    // Hitboxes (Retained exactly for gameplay mechanics & headshots)
+    const headHitbox = new THREE.Mesh(new THREE.SphereGeometry(0.32, 8, 8), new THREE.MeshBasicMaterial({ visible: false }));
+    headHitbox.position.y = 2.02 * scaleY;
+    headHitbox.userData = { zuluId: zId, part: "head" };
     group.add(headHitbox);
 
-    const bodyHitbox = new THREE.Mesh(new THREE.CylinderGeometry(.42, .38, 1.4, 8), new THREE.MeshBasicMaterial({ visible:false }));
-    bodyHitbox.position.y= 1.2;
-    bodyHitbox.userData={ zuluId:zId, part:"body" };
+    const bodyHitbox = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.38, 1.4, 8), new THREE.MeshBasicMaterial({ visible: false }));
+    bodyHitbox.position.y = 1.25 * scaleY;
+    bodyHitbox.userData = { zuluId: zId, part: "body" };
     group.add(bodyHitbox);
 
-    const posX = x !== null ? x : (Math.random()-.5)*36;
-    const posZ = z !== null ? z : -45 - Math.random()*10;
+    const posX = x !== null ? x : (Math.random() - .5) * 36;
+    const posZ = z !== null ? z : -45 - Math.random() * 10;
 
     group.position.set(posX, 0, posZ);
     scene.add(group);
 
-    const obj={
-        id:zId,
+    const obj = {
+        id: zId,
+        seed: zSeed,
         group,
         headHitbox,
         bodyHitbox,
-        hp:2,
-        animOffset: Math.random()*10,
-        attackTimer:0
+        leftLegPivot,
+        rightLegPivot,
+        leftArmPivot,
+        rightArmPivot,
+        hp: 2,
+        animOffset: Math.random() * 10,
+        attackTimer: 0
     };
 
     zulus.push(obj);
@@ -2258,7 +2639,7 @@ function syncZulusFromHost(hostZulus){
     hostZulus.forEach(hz => {
         let z = zulus.find(item => item.id === hz.id);
         if(!z){
-            createZulu(hz.id, hz.x, hz.z);
+            createZulu(hz.id, hz.x, hz.z, hz.seed);
         }else{
             z.group.position.x= hz.x;
             z.group.position.z= hz.z;
@@ -2391,9 +2772,12 @@ function damageZulu(zuluId, damageAmount, hitPoint=null){
     z.hp -= damageAmount;
 
     showHitFeedback();
-    spawnHitRing(hitPoint || z.group.position.clone().add(new THREE.Vector3(0, 1.2, 0)));
+    const hitPos = hitPoint || z.group.position.clone().add(new THREE.Vector3(0, 1.2, 0));
+    spawnHitRing(hitPos);
+    emitAudioEvent('hit', hitPos);
 
     if(z.hp<=0){
+        emitAudioEvent('zulu_death', z.group.position);
         scene.remove(z.group);
         zulus.splice(idx, 1);
         STATE.score++;
@@ -2428,6 +2812,8 @@ function performAttack(){
 
         const origin = camera.getWorldPosition(new THREE.Vector3());
         spawnGunSmoke(origin, dir);
+        emitAudioEvent('musket', origin);
+        emitAudioEvent('reload', origin);
 
         if (isHost) {
             connections.forEach(c => {
@@ -2488,6 +2874,7 @@ function performAttack(){
         STATE.attackSerial++;
 
         const camPos = camera.getWorldPosition(new THREE.Vector3());
+        emitAudioEvent('sword', camPos);
 
         for(let i=zulus.length-1; i>=0; i--){
             const target = zulus[i].group.position.clone().add(new THREE.Vector3(0, 1.2, 0));
@@ -2621,6 +3008,7 @@ function animate(){
                             fireDir.applyQuaternion(gatlingBarrelsGroup.getWorldQuaternion(new THREE.Quaternion()));
 
                             spawnGunSmoke(muzzleWorldPos, fireDir);
+                            emitAudioEvent('gatling', muzzleWorldPos);
 
                             if (isHost) {
                                 connections.forEach(c => {
@@ -2672,6 +3060,7 @@ function animate(){
                             if (GATLING_STATE.ammo <= 0) {
                                 GATLING_STATE.reloading = true;
                                 GATLING_STATE.reloadStartTime = now;
+                                emitAudioEvent('reload', player.position);
                                 updateGatlingHUD();
                             }
                         }
@@ -2705,9 +3094,14 @@ function animate(){
                     if(!checkMountainCollision(next)){
                         player.position.copy(next);
                     }
+
+                    const nowStep = performance.now();
+                    if (nowStep - lastLocalStepTime > 340) {
+                        emitAudioEvent('footstep', player.position);
+                        lastLocalStepTime = nowStep;
+                    }
                 }
 
-                /* FIXED: Pass local reloading state into updateCharacterPose */
                 updateCharacterPose(
                     playerModel,
                     STATE.isMoving,
@@ -2731,6 +3125,8 @@ function animate(){
                     z.attackTimer= CONFIG.zuluAttackCooldown;
 
                     showDamageFlash();
+                    emitAudioEvent('zulu_attack', z.group.position);
+                    emitAudioEvent('hit', player.position);
                     document.getElementById("hp-val").innerText = Math.max(0, Math.ceil(STATE.hp));
 
                     if(STATE.hp<=0){
@@ -2814,6 +3210,7 @@ function animate(){
                         if(b.touchTimer>=3){
                             b.active=false;
                             b.mesh.visible= false;
+                            emitAudioEvent('hit', new THREE.Vector3(b.x, 0.4, b.z));
                         }
                         break;
                     }
@@ -2824,7 +3221,21 @@ function animate(){
                     z.group.position.addScaledVector(dir, CONFIG.baseSpeed);
                     z.group.lookAt(z.group.position.x + dir.x, z.group.position.y, z.group.position.z + dir.z);
                     z.group.rotation.y = Math.atan2(dir.x, dir.z);
-                    z.group.rotation.z = Math.sin(time*12 + z.animOffset) * 0.08;
+
+                    // Limb Running Animations
+                    if (z.leftLegPivot && z.rightLegPivot && z.leftArmPivot && z.rightArmPivot) {
+                        const walk = Math.sin(time * 10 + z.animOffset);
+                        z.leftLegPivot.rotation.x = walk * 0.55;
+                        z.rightLegPivot.rotation.x = -walk * 0.55;
+
+                        if (z.attackTimer > 0.6) {
+                            // Thrust spear during attack
+                            z.rightArmPivot.rotation.x = -1.1;
+                        } else {
+                            z.leftArmPivot.rotation.x = -walk * 0.35;
+                            z.rightArmPivot.rotation.x = walk * 0.35;
+                        }
+                    }
                 }
             });
         }
