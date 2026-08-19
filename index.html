@@ -1064,7 +1064,6 @@ let gatlingBarrelsGroup = null;
 let gatlingBarrelsMesh = null;
 
 function buildGatlingGun() {
-    // Prevent spawning duplicate Gatling guns if one already exists in scene
     if (gatlingGroup) return;
 
     gatlingGroup = new THREE.Group();
@@ -1410,7 +1409,8 @@ function pointArmAt(pivot, target){
     pivot.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction);
 }
 
-function updateCharacterPose(model, isMoving, weapon, time, delta, isMountedGatling = false){
+/* FIXED: Accept isReloading directly instead of assuming model === playerModel */
+function updateCharacterPose(model, isMoving, weapon, time, delta, isMountedGatling = false, isReloading = false){
     const data = model.userData;
     if (!data.leftArm || !data.rightArm) return;
 
@@ -1454,7 +1454,7 @@ function updateCharacterPose(model, isMoving, weapon, time, delta, isMountedGatl
         rArm.rotation.z += .08;
         lArm.rotation.z -= .06;
 
-        const reloadState = model === playerModel ? STATE.reloading : false;
+        const reloadState = isReloading;
         const targetWep = data.isOfficer ? data.pistol : data.musket;
 
         if(reloadState){
@@ -1783,7 +1783,6 @@ window.addEventListener("keydown", e => {
 
 window.addEventListener("keyup", e => { keys[e.code]=false; });
 
-/* FIXED: Allow selecting Gatling gun role at any time without disabling button */
 function setRole(role) {
     selectedRole = role;
 
@@ -1796,7 +1795,7 @@ function setRole(role) {
     } else if (role === 'gatling') {
         STATE.isOfficer = false;
         GATLING_STATE.unlocked = true;
-        buildGatlingGun(); // Build gun if not built already
+        buildGatlingGun();
     } else {
         STATE.isOfficer = false;
     }
@@ -1867,13 +1866,15 @@ function syncRemotePlayers(playersData) {
             rp.mesh.userData.slashTime = performance.now();
         }
 
+        /* FIXED: Pass p.reloading into updateCharacterPose */
         updateCharacterPose(
             rp.mesh,
             p.isMoving,
             p.equippedWeapon || 'musket',
             clock.getElapsedTime(),
             0.016,
-            p.isMountedGatling
+            p.isMountedGatling,
+            p.reloading
         );
     });
 
@@ -2093,6 +2094,9 @@ function setupClientNetwork(){
 
 function sendNetworkPacket(){
     if (isHost) {
+        /* FIXED: Host must synchronize remote player meshes so it can render them */
+        syncRemotePlayers(Object.values(remotePlayersData));
+
         const localId = peer ? peer.id : 'host';
         const playersArray = [
             {
@@ -2537,7 +2541,6 @@ function animate(){
     updateGunSmoke(delta);
     updateHitRings(delta);
 
-    // Dynamic Team Wipe Check when local player is dead
     if (STATE.isDead) {
         checkTeamWipe();
     }
@@ -2583,7 +2586,8 @@ function animate(){
                     STATE.weapon,
                     time,
                     delta,
-                    true
+                    true,
+                    false
                 );
 
                 const now = performance.now();
@@ -2703,12 +2707,15 @@ function animate(){
                     }
                 }
 
+                /* FIXED: Pass local reloading state into updateCharacterPose */
                 updateCharacterPose(
                     playerModel,
                     STATE.isMoving,
                     STATE.weapon,
                     time,
-                    delta
+                    delta,
+                    false,
+                    STATE.reloading
                 );
             }
 
@@ -2840,7 +2847,6 @@ function handlePlayerDeath() {
     checkTeamWipe();
 }
 
-/* FIXED: Checks whether all team members are dead and displays Game Over screen */
 function checkTeamWipe() {
     if (STATE.gameOver) return;
     if (!STATE.isDead) return;
