@@ -914,19 +914,20 @@ function playSound3D(type, posVec3) {
     const now = audioCtx.currentTime;
 
     if (type === 'musket') {
+        // Deep thunderous black-powder boom with snappy initial blast & long smoke echo
         let osc = audioCtx.createOscillator();
         let gain = audioCtx.createGain();
         osc.type = 'sawtooth';
-        osc.frequency.setValueAtTime(160, now);
-        osc.frequency.exponentialRampToValueAtTime(30, now + 0.35);
-        gain.gain.setValueAtTime(vol * 0.9, now);
-        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
+        osc.frequency.setValueAtTime(220, now);
+        osc.frequency.exponentialRampToValueAtTime(25, now + 0.45);
+        gain.gain.setValueAtTime(vol * 1.2, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.45);
         osc.connect(gain);
         gain.connect(audioCtx.destination);
         osc.start(now);
-        osc.stop(now + 0.35);
+        osc.stop(now + 0.45);
 
-        let bufferSize = audioCtx.sampleRate * 0.4;
+        let bufferSize = audioCtx.sampleRate * 0.5;
         let buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
         let output = buffer.getChannelData(0);
         for (let i = 0; i < bufferSize; i++) output[i] = Math.random() * 2 - 1;
@@ -934,11 +935,43 @@ function playSound3D(type, posVec3) {
         noise.buffer = buffer;
         let filter = audioCtx.createBiquadFilter();
         filter.type = 'lowpass';
-        filter.frequency.setValueAtTime(2800, now);
-        filter.frequency.exponentialRampToValueAtTime(200, now + 0.4);
+        filter.frequency.setValueAtTime(3500, now);
+        filter.frequency.exponentialRampToValueAtTime(150, now + 0.5);
         let noiseGain = audioCtx.createGain();
-        noiseGain.gain.setValueAtTime(vol * 1.0, now);
-        noiseGain.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+        noiseGain.gain.setValueAtTime(vol * 1.3, now);
+        noiseGain.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
+        noise.connect(filter);
+        filter.connect(noiseGain);
+        noiseGain.connect(audioCtx.destination);
+        noise.start(now);
+
+    } else if (type === 'pistol') {
+        // Sharp, punchy flintlock/caplock pistol pop
+        let osc = audioCtx.createOscillator();
+        let gain = audioCtx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(380, now);
+        osc.frequency.exponentialRampToValueAtTime(40, now + 0.22);
+        gain.gain.setValueAtTime(vol * 1.0, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.22);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start(now);
+        osc.stop(now + 0.22);
+
+        let bufferSize = audioCtx.sampleRate * 0.25;
+        let buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+        let output = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) output[i] = Math.random() * 2 - 1;
+        let noise = audioCtx.createBufferSource();
+        noise.buffer = buffer;
+        let filter = audioCtx.createBiquadFilter();
+        filter.type = 'bandpass';
+        filter.frequency.setValueAtTime(2200, now);
+        filter.frequency.exponentialRampToValueAtTime(300, now + 0.25);
+        let noiseGain = audioCtx.createGain();
+        noiseGain.gain.setValueAtTime(vol * 1.1, now);
+        noiseGain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
         noise.connect(filter);
         filter.connect(noiseGain);
         noiseGain.connect(audioCtx.destination);
@@ -2687,7 +2720,8 @@ function showWaveBanner(title, subtitle){
 
 function startWave(num){
     STATE.wave=num;
-    STATE.zulusToSpawnInWave = 4 + num*4;
+    // Each wave spawns 1.5x more enemies than the previous wave
+    STATE.zulusToSpawnInWave = Math.floor(8 * Math.pow(1.5, num - 1));
     STATE.zulusRemainingInWave = STATE.zulusToSpawnInWave;
     STATE.waveActive=false;
 
@@ -2812,7 +2846,9 @@ function performAttack(){
 
         const origin = camera.getWorldPosition(new THREE.Vector3());
         spawnGunSmoke(origin, dir);
-        emitAudioEvent('musket', origin);
+        
+        // Play specific sound depending on class (officer gets pistol snap, soldier gets heavy musket boom)
+        emitAudioEvent(STATE.isOfficer ? 'pistol' : 'musket', origin);
         emitAudioEvent('reload', origin);
 
         if (isHost) {
@@ -2845,8 +2881,8 @@ function performAttack(){
         if(hits.length>0){
             const hit = hits[0];
             const zuluId = hit.object.userData.zuluId;
-            const part = hit.object.userData.part;
-            const damage = part === "head" ? 2 : 1;
+            // Musket deals 2 damage to ONE-SHOT kill on any part of the enemy body!
+            const damage = 2;
             const z = zulus.find(item => item.id=== zuluId);
 
             if(z){
@@ -2917,6 +2953,32 @@ document.getElementById("btn-switch").addEventListener("click", switchWeapon);
 let lastSpawn=0;
 const clock = new THREE.Clock();
 
+function checkTeamWipe() {
+    if (!isHost) return;
+    let allDead = STATE.isDead;
+    Object.values(remotePlayersData).forEach(rp => {
+        if (!rp.isDead) allDead = false;
+    });
+    if (allDead && !STATE.gameOver) {
+        triggerGameOver();
+        connections.forEach(c => {
+            if (c && c.open) c.send({ type: "GAME_OVER" });
+        });
+    }
+}
+
+function triggerGameOver() {
+    STATE.gameOver = true;
+    if (document.exitPointerLock) document.exitPointerLock();
+    document.getElementById("final-wave").innerText = STATE.wave;
+    document.getElementById("final-score").innerText = STATE.score;
+    document.getElementById("game-over").style.display = "flex";
+}
+
+function resetGame() {
+    location.reload();
+}
+
 function animate(){
     requestAnimationFrame(animate);
 
@@ -2927,6 +2989,17 @@ function animate(){
 
     updateGunSmoke(delta);
     updateHitRings(delta);
+
+    if (STATE.reloading && STATE.weapon === 'musket') {
+        const elapsed = performance.now() - STATE.lastAttackTime;
+        const progress = Math.min(elapsed / CONFIG.musketCooldown, 1);
+        document.getElementById("reload-bar").style.width = `${progress * 100}%`;
+        if (progress >= 1) {
+            STATE.reloading = false;
+            document.getElementById("reload-bar-container").style.display = "none";
+            document.getElementById("ammo-val").innerText = "READY";
+        }
+    }
 
     if (STATE.isDead) {
         checkTeamWipe();
@@ -3127,199 +3200,81 @@ function animate(){
                     showDamageFlash();
                     emitAudioEvent('zulu_attack', z.group.position);
                     emitAudioEvent('hit', player.position);
-                    document.getElementById("hp-val").innerText = Math.max(0, Math.ceil(STATE.hp));
+                    
+                    const hpEl = document.getElementById("hp-val");
+                    if (hpEl) hpEl.innerText = Math.max(0, Math.floor(STATE.hp));
 
-                    if(STATE.hp<=0){
-                        handlePlayerDeath();
+                    if (STATE.hp <= 0 && !STATE.isDead) {
+                        STATE.isDead = true;
+                        if (STATE.isMountedGatling) toggleGatlingMount();
+                        setCameraMode(STATE.cameraMode);
+                        if (!isHost && conn) {
+                            document.getElementById("spectator-msg").style.display = "block";
+                        }
                     }
                 }
             });
         }
+    }
 
-        if(STATE.reloading && !STATE.isMountedGatling){
-            const now = performance.now();
-            const elapsed = now - STATE.lastAttackTime;
-            const progress = Math.min(elapsed / CONFIG.musketCooldown, 1);
-
-            document.getElementById("reload-bar").style.width = `${progress*100}%`;
-
-            if(progress>=1){
-                STATE.reloading=false;
-                STATE.musketReloadUntil=0;
-                document.getElementById("reload-bar-container").style.display = "none";
-                document.getElementById("reload-bar").style.width = "0%";
-                document.getElementById("ammo-val").innerText = "READY";
+    if (isHost) {
+        if (STATE.waveActive && STATE.zulusToSpawnInWave > 0) {
+            if (time - lastSpawn > (CONFIG.baseSpawnInterval / 1000)) {
+                createZulu();
+                STATE.zulusToSpawnInWave--;
+                lastSpawn = time;
             }
         }
 
-        if(STATE.weapon === "sword" && !STATE.isMountedGatling){
-            const slashAge = performance.now() - (swordGroup.userData.slashTime || 0);
+        zulus.forEach(z => {
+            let targetPos = player.position;
+            let minDist = z.group.position.distanceTo(player.position);
 
-            if(slashAge>=0 && slashAge<280){
-                const t = slashAge/280;
-                const swing = Math.sin(t*Math.PI);
-                swordGroup.rotation.z = -Math.PI/1.5 + swing*.85;
-                swordGroup.rotation.x = -Math.PI/3 + swing*.25;
-            }else{
-                swordGroup.rotation.z += (0 - swordGroup.rotation.z)*.15;
-                swordGroup.rotation.x += (-Math.PI/3 - swordGroup.rotation.x)*.15;
-            }
-        }
+            if (STATE.isDead) minDist = Infinity;
 
-        if((isHost || !conn) && STATE.waveActive && STATE.zulusToSpawnInWave>0 && performance.now() - lastSpawn > CONFIG.baseSpawnInterval){
-            createZulu();
-            STATE.zulusToSpawnInWave--;
-            lastSpawn = performance.now();
-        }
-
-        if(isHost || !conn){
-            zulus.forEach(z => {
-                let targetPos = player.position;
-                let minDist = Infinity;
-
-                if (!STATE.isDead) {
-                    minDist = z.group.position.distanceTo(player.position);
-                    targetPos = player.position;
-                }
-
-                Object.values(remotePlayersData).forEach(rp => {
-                    if (rp.isDead) return;
-                    const rpPos = new THREE.Vector3(rp.x, rp.y, rp.z);
-                    const dRemote = z.group.position.distanceTo(rpPos);
-                    if (dRemote < minDist) {
-                        minDist = dRemote;
-                        targetPos = rpPos;
+            Object.values(remotePlayersData).forEach(rp => {
+                if (!rp.isDead) {
+                    const pVec = new THREE.Vector3(rp.x, rp.y, rp.z);
+                    const d = z.group.position.distanceTo(pVec);
+                    if (d < minDist) {
+                        minDist = d;
+                        targetPos = pVec;
                     }
-                });
+                }
+            });
 
-                const dir = targetPos.clone().sub(z.group.position);
-                dir.y=0;
-
-                let blocked=false;
-
-                for(const b of barricades){
-                    if(!b.active) continue;
-
-                    const dx = z.group.position.x - b.x;
-                    const dz = z.group.position.z - b.z;
-
-                    if(dx*dx + dz*dz < 1.44){
-                        blocked=true;
+            let blockedByBarricade = false;
+            barricades.forEach(b => {
+                if (b.active) {
+                    const bPos = new THREE.Vector3(b.x, 0, b.z);
+                    const dBar = z.group.position.distanceTo(bPos);
+                    if (dBar < 1.2) {
+                        blockedByBarricade = true;
                         b.touchTimer += delta;
-
-                        if(b.touchTimer>=3){
-                            b.active=false;
-                            b.mesh.visible= false;
-                            emitAudioEvent('hit', new THREE.Vector3(b.x, 0.4, b.z));
-                        }
-                        break;
-                    }
-                }
-
-                if(!blocked && dir.length() > CONFIG.zuluStopDistance){
-                    dir.normalize();
-                    z.group.position.addScaledVector(dir, CONFIG.baseSpeed);
-                    z.group.lookAt(z.group.position.x + dir.x, z.group.position.y, z.group.position.z + dir.z);
-                    z.group.rotation.y = Math.atan2(dir.x, dir.z);
-
-                    // Limb Running Animations
-                    if (z.leftLegPivot && z.rightLegPivot && z.leftArmPivot && z.rightArmPivot) {
-                        const walk = Math.sin(time * 10 + z.animOffset);
-                        z.leftLegPivot.rotation.x = walk * 0.55;
-                        z.rightLegPivot.rotation.x = -walk * 0.55;
-
-                        if (z.attackTimer > 0.6) {
-                            // Thrust spear during attack
-                            z.rightArmPivot.rotation.x = -1.1;
-                        } else {
-                            z.leftArmPivot.rotation.x = -walk * 0.35;
-                            z.rightArmPivot.rotation.x = walk * 0.35;
+                        if (b.touchTimer > 2.5) {
+                            b.active = false;
+                            b.mesh.visible = false;
                         }
                     }
                 }
             });
-        }
-    }
 
-    renderer.render(scene, camera);
-}
+            if (!blockedByBarricade && minDist > CONFIG.zuluStopDistance) {
+                const moveDir = targetPos.clone().sub(z.group.position);
+                moveDir.y = 0;
+                moveDir.normalize();
 
-function handlePlayerDeath() {
-    STATE.isDead = true;
-    playerModel.visible = false;
-    weaponNode.visible = false;
-    document.getElementById("spectator-msg").style.display = "block";
-    document.getElementById("hp-val").innerText = "0";
+                z.group.position.addScaledVector(moveDir, CONFIG.baseSpeed * 60 * delta);
+                z.group.lookAt(targetPos.x, z.group.position.y, targetPos.z);
 
-    if (STATE.isMountedGatling) {
-        toggleGatlingMount();
-    }
-
-    checkTeamWipe();
-}
-
-function checkTeamWipe() {
-    if (STATE.gameOver) return;
-    if (!STATE.isDead) return;
-
-    let allRemoteDead = true;
-    const remoteList = Object.values(remotePlayersData);
-
-    for (let i = 0; i < remoteList.length; i++) {
-        if (!remoteList[i].isDead) {
-            allRemoteDead = false;
-            break;
-        }
-    }
-
-    if (allRemoteDead) {
-        triggerGameOver();
-    }
-}
-
-function triggerGameOver() {
-    if (STATE.gameOver) return;
-
-    STATE.gameOver = true;
-    document.getElementById("spectator-msg").style.display = "none";
-    document.getElementById("final-wave").innerText = STATE.wave;
-    document.getElementById("final-score").innerText = STATE.score;
-    document.getElementById("game-over").style.display = "flex";
-
-    if (document.exitPointerLock) {
-        try { document.exitPointerLock(); } catch(e){}
-    }
-
-    if (isHost && connections.length > 0) {
-        connections.forEach(c => {
-            if (c && c.open) {
-                c.send({ type: "GAME_OVER" });
+                const runAnim = Math.sin(time * 12 + z.animOffset);
+                if (z.leftLegPivot) z.leftLegPivot.rotation.x = runAnim * 0.7;
+                if (z.rightLegPivot) z.rightLegPivot.rotation.x = -runAnim * 0.7;
             }
         });
     }
-}
 
-function resetGame() {
-    STATE.hp = 100;
-    STATE.score = 0;
-    STATE.gameOver = false;
-    STATE.isDead = false;
-    STATE.wave = 1;
-
-    document.getElementById("hp-val").innerText = "100";
-    document.getElementById("score-val").innerText = "0";
-    document.getElementById("spectator-msg").style.display = "none";
-    document.getElementById("game-over").style.display = "none";
-
-    player.position.set(0, 0, 0);
-    setCameraMode(STATE.cameraMode);
-
-    zulus.forEach(z => scene.remove(z.group));
-    zulus.length = 0;
-
-    if (isHost) {
-        startWave(1);
-    }
+    renderer.render(scene, camera);
 }
 
 animate();
